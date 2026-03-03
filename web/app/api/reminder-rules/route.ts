@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@/lib/generated/prisma";
 import type { ReminderChannel, ReminderTriggerType } from "@/lib/generated/prisma";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requireRole, isSuperAdmin, type AuthUser } from "@/lib/auth-guard";
+import { requireAuth, requireRole, type AuthUser } from "@/lib/auth-guard";
 
 const REMINDER_CHANNELS: ReminderChannel[] = ["SMS", "WHATSAPP", "EMAIL"];
 const REMINDER_TRIGGER_TYPES: ReminderTriggerType[] = [
@@ -15,7 +15,6 @@ const REMINDER_TRIGGER_TYPES: ReminderTriggerType[] = [
 
 interface ReminderRulePatchBody {
   id?: string;
-  orgId?: string;
   isActive?: boolean;
   daysOffset?: number;
   channel?: ReminderChannel;
@@ -23,10 +22,7 @@ interface ReminderRulePatchBody {
   triggerType?: ReminderTriggerType;
 }
 
-function resolveOrganizationId(user: AuthUser, orgIdParam?: string | null): string | null {
-  if (isSuperAdmin(user)) {
-    return orgIdParam ?? user.organizationId;
-  }
+function resolveOrganizationId(user: AuthUser): string | null {
   return user.organizationId;
 }
 
@@ -39,7 +35,7 @@ function isReminderTriggerType(value: unknown): value is ReminderTriggerType {
 }
 
 /**
- * GET /api/reminder-rules?orgId=ORG_ID
+ * GET /api/reminder-rules
  *
  * List reminder rules for the authenticated tenant.
  */
@@ -50,8 +46,7 @@ export async function GET(request: Request) {
   const denied = requireRole(guard, "SUPER_ADMIN", "ORG_ADMIN", "CAMPUS_ADMIN", "REGION_ADMIN");
   if (denied) return denied;
 
-  const { searchParams } = new URL(request.url);
-  const orgId = resolveOrganizationId(guard, searchParams.get("orgId"));
+  const orgId = resolveOrganizationId(guard);
   if (!orgId) {
     return NextResponse.json({ error: "Organization context required" }, { status: 400 });
   }
@@ -71,7 +66,7 @@ export async function GET(request: Request) {
 /**
  * PATCH /api/reminder-rules
  *
- * Body: { id, isActive?, daysOffset?, channel?, templateKey?, triggerType?, orgId? }
+ * Body: { id, isActive?, daysOffset?, channel?, templateKey?, triggerType? }
  * Updates a reminder rule for the authenticated tenant.
  */
 export async function PATCH(request: Request) {
@@ -83,7 +78,7 @@ export async function PATCH(request: Request) {
 
   try {
     const body = (await request.json()) as ReminderRulePatchBody;
-    const orgId = resolveOrganizationId(guard, body.orgId ?? null);
+    const orgId = resolveOrganizationId(guard);
 
     if (!orgId) {
       return NextResponse.json({ error: "Organization context required" }, { status: 400 });

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
-import { requireAuth, requireRole, isSuperAdmin } from "@/lib/auth-guard";
+import { requireAuth, requireRole } from "@/lib/auth-guard";
+import { resolveAuditActor } from "@/lib/audit/resolve-audit-actor";
+import { prisma } from "@/lib/prisma";
 import type { AttendanceStatus } from "@/lib/generated/prisma";
+import type { Prisma } from "@/lib/generated/prisma";
 import {
   bulkMarkAttendance,
   getSectionAttendanceByDate,
@@ -11,6 +14,15 @@ import {
   AttendanceError,
 } from "@/lib/academic/attendance.service";
 import { AcademicYearError } from "@/lib/academic/academic-year.service";
+
+function isPrismaP2028(error: unknown): boolean {
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as Prisma.PrismaClientKnownRequestError).code === "P2028",
+  );
+}
 
 /**
  * GET /api/academic/attendance
@@ -32,9 +44,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
 
-    const orgId = isSuperAdmin(guard)
-      ? (searchParams.get("orgId") ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json(
@@ -165,11 +175,10 @@ export async function POST(request: Request) {
   if (roleCheck) return roleCheck;
 
   try {
+    const audit = resolveAuditActor(guard);
     const body = (await request.json()) as Record<string, unknown>;
 
-    const orgId = isSuperAdmin(guard)
-      ? ((body.orgId as string) ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json(
@@ -197,15 +206,58 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await bulkMarkAttendance({
-      organizationId: orgId,
-      academicYearId,
-      campusId,
-      classId,
-      sectionId,
-      date: new Date(dateStr),
-      markedById: guard.membershipId ?? undefined,
-      entries,
+    const MAX_ATTENDANCE_RETRIES = 3;
+    let result: Awaited<ReturnType<typeof bulkMarkAttendance>> | null = null;
+    for (let attempt = 1; attempt <= MAX_ATTENDANCE_RETRIES; attempt += 1) {
+      try {
+        result = await bulkMarkAttendance({
+          organizationId: orgId,
+          academicYearId,
+          campusId,
+          classId,
+          sectionId,
+          date: new Date(dateStr),
+          markedById: guard.membershipId ?? undefined,
+          entries,
+        });
+        break;
+      } catch (error) {
+        if (!isPrismaP2028(error) || attempt === MAX_ATTENDANCE_RETRIES) {
+          throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 150 * attempt));
+      }
+    }
+
+    if (!result) {
+      return NextResponse.json(
+        { ok: false, error: "Attendance marking failed after retries" },
+        { status: 500 },
+      );
+    }
+
+    await prisma.domainEventLog.create({
+      data: {
+        organizationId: audit.tenantId,
+        eventType: "ATTENDANCE_BULK_MARKED",
+        payload: {
+          sectionId,
+          campusId,
+          classId,
+          academicYearId,
+          entryCount: entries.length,
+          _audit: {
+            actorUserId: audit.actorUserId,
+            effectiveUserId: audit.effectiveUserId,
+            tenantId: audit.tenantId,
+            impersonation: audit.impersonation,
+            impersonatedTenantId: audit.impersonation ? audit.tenantId : null,
+          },
+        },
+        occurredAt: new Date(),
+        initiatedByUserId: audit.actorUserId,
+        processed: true,
+      },
     });
 
     return NextResponse.json({ ok: true, data: result });

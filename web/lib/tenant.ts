@@ -90,16 +90,24 @@ export function scopeFilter(
 
 /**
  * For POST/PUT, determine the effective organizationId.
- * SUPER_ADMIN may override via request body; everyone else uses their session value.
+ * Tenant context must come from authenticated session only.
  */
 export function resolveOrgId(
   guard: AuthUser,
   bodyOrgId?: string | null,
 ): string {
-  if (isSuperAdmin(guard) && bodyOrgId) {
-    return bodyOrgId;
+  const sessionOrgId = guard.organizationId ?? "";
+
+  if (!sessionOrgId) {
+    return "";
   }
-  return guard.organizationId ?? "";
+
+  // Defensive check: reject client-supplied tenant override attempts.
+  if (bodyOrgId && bodyOrgId !== sessionOrgId) {
+    throw new Error("Tenant override attempt detected");
+  }
+
+  return sessionOrgId;
 }
 
 // ────────────────────────────────────────────────────────────

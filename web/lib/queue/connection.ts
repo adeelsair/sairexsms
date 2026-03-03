@@ -1,9 +1,10 @@
 import IORedis from "ioredis";
+import type { ConnectionOptions } from "bullmq";
 
 let connection: IORedis | null = null;
 
-export function getRedisConnection(): IORedis {
-  if (connection) return connection;
+export function getRedisConnection(): IORedis & ConnectionOptions {
+  if (connection) return connection as unknown as IORedis & ConnectionOptions;
 
   const url = process.env.REDIS_URL || "redis://127.0.0.1:6379";
 
@@ -19,5 +20,5 @@ export function getRedisConnection(): IORedis {
     console.error("[Redis] Connection error:", err.message);
   });
 
-  return connection;
+  return connection as unknown as IORedis & ConnectionOptions;
 }

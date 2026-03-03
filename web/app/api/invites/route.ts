@@ -138,7 +138,7 @@ export async function POST(request: Request) {
   if (denied) return denied;
 
   try {
-    const { email, role, organizationId } = await request.json();
+    const { email, role } = await request.json();
 
     if (!email || !role) {
       return NextResponse.json(
@@ -162,7 +162,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const targetOrgId = resolveOrgId(guard, organizationId);
+    const targetOrgId = resolveOrgId(guard);
 
     const existingUser = await prisma.user.findUnique({
       where: { email: email.toLowerCase() },

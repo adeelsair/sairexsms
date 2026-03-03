@@ -12,7 +12,6 @@ const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 const schema = z.object({
   fileType: z.string().refine((t) => ALLOWED_TYPES.includes(t), "Unsupported file type"),
   fileSize: z.number().max(MAX_SIZE, "File too large (max 5 MB)"),
-  organizationId: z.string().optional(),
 });
 
 /**
@@ -35,7 +34,7 @@ export async function POST(request: Request) {
     }
 
     const { fileType } = parsed.data;
-    const orgId = resolveOrgId(guard, parsed.data.organizationId);
+    const orgId = resolveOrgId(guard);
 
     const ext = fileType.split("/")[1] === "svg+xml" ? "svg" : fileType.split("/")[1];
     const key = `organizations/${orgId}/branding/logo_${Date.now()}.${ext}`;

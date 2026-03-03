@@ -3,7 +3,6 @@
 import { useState, useEffect, Suspense } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -113,13 +112,15 @@ function SignupForm() {
         // Invite flow: auto-verified → sign in immediately
         toast.success("Account created successfully");
 
-        const signInResult = await signIn("credentials", {
-          email: data.email,
-          password: data.password,
-          redirect: false,
-        });
+        const signInResult = await api.post<{ ok: boolean; user: { id: string } }>(
+          "/api/auth/local-login",
+          {
+            email: data.email,
+            password: data.password,
+          },
+        );
 
-        if (signInResult?.error) {
+        if (!signInResult.ok) {
           router.push("/login");
         } else {
           router.push("/admin/dashboard");

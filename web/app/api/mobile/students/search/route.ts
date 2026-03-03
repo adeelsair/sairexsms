@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { isSuperAdmin, requireAuth, requireRole } from "@/lib/auth-guard";
+import { requireAuth, requireRole } from "@/lib/auth-guard";
 import {
   PaymentEntryError,
   searchStudentsForPayments,
@@ -27,12 +27,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("q") ?? "";
     const limit = Number(searchParams.get("limit") ?? 15);
-    const requestedOrgId = searchParams.get("orgId");
-
-    const organizationId =
-      isSuperAdmin(guard) && requestedOrgId
-        ? requestedOrgId
-        : guard.organizationId;
+    const organizationId = guard.organizationId;
 
     if (!organizationId) {
       return NextResponse.json(

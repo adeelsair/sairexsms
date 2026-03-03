@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api-client";
@@ -13,6 +14,13 @@ import {
   SxStatusBadge,
   type SxColumn,
 } from "@/components/sx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface DashboardStat extends Record<string, unknown> {
   key: string;
@@ -46,6 +54,27 @@ interface DemoSchoolResponse {
     demoRedirect: string;
   };
   error?: string;
+}
+
+interface ImpersonationTenant {
+  id: string;
+  name: string;
+}
+
+interface ImpersonationListResponse {
+  ok: boolean;
+  data: {
+    tenants: ImpersonationTenant[];
+  };
+}
+
+interface ImpersonationStartResponse {
+  ok: boolean;
+  data: {
+    tenantId: string;
+    tenantName: string;
+    expiresAt: string;
+  };
 }
 
 type TrendTone = "growth" | "decline" | "neutral";
@@ -88,6 +117,10 @@ function trendClass(tone: TrendTone): string {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isImpersonating = Boolean(
+    (session?.user as { impersonation?: boolean } | undefined)?.impersonation,
+  );
   const [stats, setStats] = useState<DashboardStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<"SIMPLE" | "PRO" | null>(null);
@@ -96,6 +129,9 @@ export default function DashboardPage() {
   const [hasOrganizationContext, setHasOrganizationContext] = useState(true);
   const [isGeneratingDemo, setIsGeneratingDemo] = useState(false);
   const [isResettingDemo, setIsResettingDemo] = useState(false);
+  const [tenants, setTenants] = useState<ImpersonationTenant[]>([]);
+  const [targetTenantId, setTargetTenantId] = useState<string>("");
+  const [startingImpersonation, setStartingImpersonation] = useState(false);
 
   const fetchStats = useCallback(async () => {
     setLoading(true);
@@ -121,6 +157,20 @@ export default function DashboardPage() {
       router.replace("/mobile/dashboard");
     }
   }, [router]);
+
+  const loadImpersonationTargets = useCallback(async () => {
+    const result = await api.get<ImpersonationListResponse>("/api/superadmin/impersonate");
+    if (!result.ok || !result.data.ok) {
+      if (result.ok && !result.data.ok) {
+        toast.error("Failed to load tenant list");
+      } else {
+        toast.error(result.ok ? "Failed to load tenant list" : (result.error ?? "Failed to load tenant list"));
+      }
+      return;
+    }
+
+    setTenants(result.data.data.tenants);
+  }, []);
 
   const toggleMode = useCallback(async () => {
     if (!mode) return;
@@ -148,7 +198,7 @@ export default function DashboardPage() {
       return;
     }
     fetchStats();
-  }, [fetchStats, hasOrganizationContext, mode, router]);
+  }, [fetchStats, hasOrganizationContext, isSuperAdmin, mode, router]);
 
   const generateDemo = useCallback(async () => {
     setIsGeneratingDemo(true);
@@ -188,13 +238,55 @@ export default function DashboardPage() {
     router.push(result.data.data.demoRedirect);
   }, [router]);
 
+  const startImpersonation = useCallback(async () => {
+    if (!targetTenantId) {
+      toast.error("Select a tenant first");
+      return;
+    }
+
+    setStartingImpersonation(true);
+    const result = await api.post<ImpersonationStartResponse>("/api/superadmin/impersonate", {
+      targetId: targetTenantId,
+    });
+    setStartingImpersonation(false);
+
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+
+    if (!result.data.ok) {
+      toast.error("Failed to start impersonation");
+      return;
+    }
+
+    toast.success(`Impersonation started for ${result.data.data.tenantName}`);
+    router.refresh();
+  }, [router, targetTenantId]);
+
   useEffect(() => {
-    fetchMode();
+    const timer = window.setTimeout(() => {
+      void fetchMode();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [fetchMode]);
 
   useEffect(() => {
+    if (isSuperAdmin && !isImpersonating) {
+      const timer = window.setTimeout(() => {
+        void loadImpersonationTargets();
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+    return undefined;
+  }, [isImpersonating, isSuperAdmin, loadImpersonationTargets]);
+
+  useEffect(() => {
     if (mode === "SIMPLE") return;
-    fetchStats();
+    const timer = window.setTimeout(() => {
+      void fetchStats();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [fetchStats, mode]);
 
   const subtitle = useMemo(() => {
@@ -202,12 +294,12 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="space-y-6 bg-background">
+    <div className="min-w-0 space-y-6 bg-background">
       <SxPageHeader
         title="Dashboard"
         subtitle={subtitle}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex max-w-full flex-wrap items-center gap-2">
             <SxStatusBadge variant="success">Live</SxStatusBadge>
             {hasOrganizationContext ? (
               <SxButton sxVariant="secondary" loading={switchingMode} onClick={toggleMode}>
@@ -216,12 +308,38 @@ export default function DashboardPage() {
             ) : null}
             {isSuperAdmin ? (
               <>
-                <SxButton sxVariant="outline" loading={isGeneratingDemo} onClick={generateDemo}>
-                  Generate Demo School
-                </SxButton>
-                <SxButton sxVariant="outline" loading={isResettingDemo} onClick={resetDemo}>
-                  Reset Demo
-                </SxButton>
+                {!isImpersonating ? (
+                  <>
+                    <Select value={targetTenantId} onValueChange={setTargetTenantId}>
+                      <SelectTrigger className="w-full min-w-0 border-2 text-foreground data-[placeholder]:text-foreground sm:w-64">
+                        <SelectValue
+                          className="font-medium data-[placeholder]:text-foreground"
+                          placeholder="Select Organization"
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tenants.map((tenant) => (
+                          <SelectItem key={tenant.id} value={tenant.id}>
+                            {tenant.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <SxButton
+                      sxVariant="outline"
+                      loading={startingImpersonation}
+                      onClick={startImpersonation}
+                    >
+                      Enter
+                    </SxButton>
+                    <SxButton sxVariant="outline" loading={isGeneratingDemo} onClick={generateDemo}>
+                      Generate Demo School
+                    </SxButton>
+                    <SxButton sxVariant="outline" loading={isResettingDemo} onClick={resetDemo}>
+                      Reset Demo
+                    </SxButton>
+                  </>
+                ) : null}
               </>
             ) : null}
             <SxButton sxVariant="outline" onClick={fetchStats}>

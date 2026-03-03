@@ -65,7 +65,7 @@ function buildReminderScope(guard: AuthUser, orgId: string): Prisma.ReminderLogW
 }
 
 /**
- * GET /api/admin/reminders?take=100&orgId=ORG_ID
+ * GET /api/admin/reminders?take=100
  *
  * Tenant-scoped reminder delivery history for admin surfaces.
  */
@@ -78,10 +78,7 @@ export async function GET(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const requestedOrgId = searchParams.get("orgId");
-    const organizationId = isSuperAdmin(guard)
-      ? (requestedOrgId ?? guard.organizationId)
-      : guard.organizationId;
+    const organizationId = guard.organizationId;
 
     if (!organizationId) {
       return NextResponse.json({ error: "Organization context required" }, { status: 400 });

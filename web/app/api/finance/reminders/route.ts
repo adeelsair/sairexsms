@@ -20,10 +20,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json().catch(() => ({}));
-
-    const orgId = isSuperAdmin(guard)
-      ? ((body as Record<string, unknown>).orgId as string ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json({ ok: false, error: "Organization context required" }, { status: 400 });
@@ -56,7 +53,7 @@ export async function POST(request: Request) {
       type: "REMINDER_RUN",
       queue: REMINDER_QUEUE,
       organizationId: orgId,
-      userId: guard.userId,
+      userId: guard.id,
       payload: {
         organizationId: orgId,
         ...(payload.unitPath ? { unitPath: payload.unitPath } : {}),
@@ -86,9 +83,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
 
-    const orgId = isSuperAdmin(guard)
-      ? (searchParams.get("orgId") ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json({ ok: false, error: "Organization context required" }, { status: 400 });

@@ -34,9 +34,7 @@ export async function POST(request: Request, context: RouteContext) {
     const { id: examId } = await context.params;
     const body = (await request.json()) as Record<string, unknown>;
 
-    const orgId = isSuperAdmin(guard)
-      ? ((body.orgId as string) ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json({ ok: false, error: "Organization context required" }, { status: 400 });
@@ -96,9 +94,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     await context.params;
     const body = (await request.json()) as Record<string, unknown>;
 
-    const orgId = isSuperAdmin(guard)
-      ? ((body.orgId as string) ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json({ ok: false, error: "Organization context required" }, { status: 400 });

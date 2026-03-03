@@ -6,7 +6,8 @@
  * reconciliation engine. No finance logic is duplicated here.
  */
 import { prisma } from "@/lib/prisma";
-import type { PaymentGateway } from "@/lib/generated/prisma";
+import type { AuditActorContext } from "@/lib/audit/resolve-audit-actor";
+import type { PaymentGateway, Prisma } from "@/lib/generated/prisma";
 import { emit } from "@/lib/events";
 import type {
   PaymentGatewayAdapter,
@@ -111,6 +112,7 @@ export interface InitiatePaymentInput {
   callbackUrl: string;
   cancelUrl?: string;
   initiatedByUserId?: number;
+  auditActor?: AuditActorContext;
 }
 
 export interface InitiatePaymentResult {
@@ -187,7 +189,7 @@ export async function initiatePayment(
     amount: outstanding,
     transactionRef: session.gatewayRef,
     paymentChannel: "ONLINE_GATEWAY",
-  }, input.initiatedByUserId).catch(() => {});
+  }, input.auditActor ?? input.initiatedByUserId).catch(() => {});
 
   return {
     paymentRecordId: paymentRecord.id,
@@ -240,6 +242,7 @@ export async function processWebhook(
   }
 
   const normalized = adapter.normalizeWebhook(input.payload);
+  const gatewayPayloadJson = normalized.rawPayload as unknown as Prisma.InputJsonValue;
 
   const existing = await prisma.paymentRecord.findFirst({
     where: {
@@ -267,7 +270,7 @@ export async function processWebhook(
         where: { id: failedRecord.id },
         data: {
           status: "FAILED",
-          gatewayPayload: normalized.rawPayload,
+          gatewayPayload: gatewayPayloadJson,
         },
       });
 
@@ -294,7 +297,7 @@ export async function processWebhook(
       where: { id: paymentRecord.id },
       data: {
         paidAt: normalized.paidAt,
-        gatewayPayload: normalized.rawPayload,
+        gatewayPayload: gatewayPayloadJson,
         status: "PENDING",
       },
     });
@@ -311,7 +314,7 @@ export async function processWebhook(
         paymentChannel: "ONLINE_GATEWAY",
         gateway: input.gateway,
         gatewayRef: normalized.gatewayRef,
-        gatewayPayload: normalized.rawPayload,
+        gatewayPayload: gatewayPayloadJson,
         paidAt: normalized.paidAt,
         challanId,
         status: "PENDING",
@@ -485,19 +488,21 @@ export interface SavePaymentConfigInput {
 export async function savePaymentConfig(
   input: SavePaymentConfigInput,
 ) {
+  const configJson = (input.configJson ?? {}) as unknown as Prisma.InputJsonValue;
+
   return prisma.organizationPaymentConfig.upsert({
     where: { organizationId: input.organizationId },
     create: {
       organizationId: input.organizationId,
       primaryGateway: input.primaryGateway,
       enabledJson: input.enabledGateways,
-      configJson: input.configJson ?? {},
+      configJson,
       isActive: true,
     },
     update: {
       primaryGateway: input.primaryGateway,
       enabledJson: input.enabledGateways,
-      configJson: input.configJson ?? undefined,
+      configJson,
       isActive: true,
     },
   });

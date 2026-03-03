@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-guard";
 import { scopeFilter, resolveOrgId, validateCrossRefs } from "@/lib/tenant";
+import { incrementDailyStudentCount } from "@/lib/performance/organization-daily-stats.service";
 
 // 1. GET: Fetch all students (tenant-scoped)
 export async function GET() {
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const orgId = resolveOrgId(guard, body.organizationId);
+    const orgId = resolveOrgId(guard);
     const campusId = parseInt(body.campusId);
 
     // Cross-reference validation: ensure campus belongs to the same org
@@ -45,15 +46,19 @@ export async function POST(request: Request) {
     ]);
     if (crossRefError) return crossRefError;
 
-    const student = await prisma.student.create({
-      data: {
-        fullName: body.fullName,
-        admissionNo: body.admissionNo,
-        grade: body.grade,
-        organizationId: orgId,
-        campusId,
-        feeStatus: "Unpaid",
-      },
+    const student = await prisma.$transaction(async (tx) => {
+      const created = await tx.student.create({
+        data: {
+          fullName: body.fullName,
+          admissionNo: body.admissionNo,
+          grade: body.grade,
+          organizationId: orgId,
+          campusId,
+          feeStatus: "Unpaid",
+        },
+      });
+      await incrementDailyStudentCount(tx, { organizationId: orgId });
+      return created;
     });
 
     return NextResponse.json(student, { status: 201 });

@@ -10,30 +10,14 @@ import {
 
 const updateModeSchema = z.object({
   mode: z.enum(["SIMPLE", "PRO"]),
-  organizationId: z.string().trim().optional(),
 });
 
-function resolveTargetOrgId(
-  guard: { organizationId?: string | null },
-  incomingOrgId: string | undefined,
-): string | null {
-  if (incomingOrgId) return incomingOrgId;
-  return guard.organizationId ?? null;
-}
-
-export async function GET(request: Request) {
+export async function GET() {
   const guard = await requireAuth();
   if (guard instanceof NextResponse) return guard;
 
   try {
-    const { searchParams } = new URL(request.url);
-    const requestedOrgId = searchParams.get("organizationId") ?? undefined;
-
-    if (requestedOrgId && !isSuperAdmin(guard)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    const organizationId = resolveTargetOrgId(guard, requestedOrgId);
+    const organizationId = guard.organizationId;
     if (!organizationId && isSuperAdmin(guard)) {
       return NextResponse.json({
         organizationId: null,
@@ -77,11 +61,7 @@ export async function PATCH(request: Request) {
       );
     }
 
-    if (parsed.data.organizationId && !isSuperAdmin(guard)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    const organizationId = resolveTargetOrgId(guard, parsed.data.organizationId);
+    const organizationId = guard.organizationId;
     if (!organizationId) {
       return NextResponse.json({ error: "Organization context required" }, { status: 400 });
     }

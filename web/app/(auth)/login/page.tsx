@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import { api } from "@/lib/api-client";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,14 +18,16 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const result = await signIn("credentials", {
+    const result = await api.post<{ ok: boolean; user: { id: string } }>(
+      "/api/auth/local-login",
+      {
       email,
       password,
-      redirect: false,
-    });
+      },
+    );
 
-    if (result?.error) {
-      setError("Invalid email or password. Please try again.");
+    if (!result.ok) {
+      setError(result.error || "Invalid email or password. Please try again.");
       setLoading(false);
     } else {
       router.push("/admin/dashboard");

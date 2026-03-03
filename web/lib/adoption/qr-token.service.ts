@@ -11,6 +11,7 @@
  */
 import { prisma } from "@/lib/prisma";
 import type { QrTokenType } from "@/lib/generated/prisma";
+import { Prisma } from "@prisma/client";
 
 /* ── Default TTLs per type ────────────────────────────── */
 
@@ -76,7 +77,9 @@ export async function generateQrToken(input: GenerateQrInput): Promise<GenerateQ
       referenceId: input.referenceId,
       label: input.label,
       oneTimeUse,
-      metadata: input.metadata ?? undefined,
+      metadata: input.metadata
+        ? (input.metadata as Prisma.InputJsonValue)
+        : undefined,
       expiresAt,
       createdByUserId: input.createdByUserId,
     },
@@ -225,7 +228,7 @@ export async function resolveFeePaymentQr(tokenId: string) {
         select: { name: true },
       },
       bankAccount: {
-        select: { bankName: true, accountTitle: true, accountNo: true },
+        select: { bankName: true, accountTitle: true, accountNumber: true },
       },
     },
   });

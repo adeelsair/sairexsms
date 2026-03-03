@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, isSuperAdmin } from "@/lib/auth-guard";
+import { requireAuth } from "@/lib/auth-guard";
 import type { Prisma } from "@/lib/generated/prisma";
 
 const MAX_PAGE_SIZE = 100;
@@ -13,7 +13,7 @@ const MAX_PAGE_SIZE = 100;
  *
  * Query params:
  *   page, pageSize, action, actorUserId, targetUserId,
- *   from (or dateFrom), to (or dateTo), search, orgId (SUPER_ADMIN only)
+ *   from (or dateFrom), to (or dateTo), search
  */
 export async function GET(request: Request) {
   const guard = await requireAuth();
@@ -40,24 +40,19 @@ export async function GET(request: Request) {
 
     const where: Prisma.RbacAuditLogWhereInput = {};
 
-    if (isSuperAdmin(guard)) {
-      const orgId = searchParams.get("orgId");
-      if (orgId) where.organizationId = orgId;
-    } else {
-      where.organizationId = guard.organizationId!;
+    where.organizationId = guard.organizationId!;
 
-      if (
-        guard.organizationStructure !== "SINGLE" &&
-        guard.role !== "ORG_ADMIN" &&
-        guard.unitPath
-      ) {
-        andClauses.push({
-          OR: [
-            { newUnitPath: { startsWith: guard.unitPath } },
-            { oldUnitPath: { startsWith: guard.unitPath } },
-          ],
-        });
-      }
+    if (
+      guard.organizationStructure !== "SINGLE" &&
+      guard.role !== "ORG_ADMIN" &&
+      guard.unitPath
+    ) {
+      andClauses.push({
+        OR: [
+          { newUnitPath: { startsWith: guard.unitPath } },
+          { oldUnitPath: { startsWith: guard.unitPath } },
+        ],
+      });
     }
 
     if (action) {

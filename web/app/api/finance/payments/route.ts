@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin, requireAuth, requireRole } from "@/lib/auth-guard";
+import { requireAuth, requireRole } from "@/lib/auth-guard";
+import { resolveAuditActor } from "@/lib/audit/resolve-audit-actor";
 import type { PaymentChannel } from "@/lib/generated/prisma";
 import {
   getStudentFinancialSummary,
@@ -17,9 +18,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const view = searchParams.get("view") ?? "students";
 
-    const orgId = isSuperAdmin(guard)
-      ? (searchParams.get("orgId") ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json(
@@ -84,11 +83,10 @@ export async function POST(request: Request) {
   if (roleCheck) return roleCheck;
 
   try {
+    const auditActor = resolveAuditActor(guard);
     const body = (await request.json()) as Record<string, unknown>;
 
-    const orgId = isSuperAdmin(guard)
-      ? ((body.orgId as string) ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json(
@@ -117,6 +115,7 @@ export async function POST(request: Request) {
       paymentChannel,
       referenceNumber: (body.referenceNumber as string | undefined)?.trim() || undefined,
       notes: (body.notes as string | undefined)?.trim() || undefined,
+      auditActor,
     });
 
     return NextResponse.json({ ok: true, data }, { status: 201 });

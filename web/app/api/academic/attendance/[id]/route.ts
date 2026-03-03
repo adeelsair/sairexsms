@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireAuth, requireRole, isSuperAdmin } from "@/lib/auth-guard";
+import { requireAuth, requireRole } from "@/lib/auth-guard";
+import { resolveAuditActor } from "@/lib/audit/resolve-audit-actor";
+import { prisma } from "@/lib/prisma";
 import type { AttendanceStatus } from "@/lib/generated/prisma";
 import { updateAttendance, AttendanceError } from "@/lib/academic/attendance.service";
 import { AcademicYearError } from "@/lib/academic/academic-year.service";
@@ -23,12 +25,11 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (roleCheck) return roleCheck;
 
   try {
+    const audit = resolveAuditActor(guard);
     const { id } = await context.params;
     const body = (await request.json()) as Record<string, unknown>;
 
-    const orgId = isSuperAdmin(guard)
-      ? ((body.orgId as string) ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json(
@@ -50,6 +51,27 @@ export async function PATCH(request: Request, context: RouteContext) {
       organizationId: orgId,
       status,
       remarks: body.remarks as string | undefined,
+    });
+
+    await prisma.domainEventLog.create({
+      data: {
+        organizationId: audit.tenantId,
+        eventType: "ATTENDANCE_UPDATED",
+        payload: {
+          attendanceId: id,
+          status,
+          _audit: {
+            actorUserId: audit.actorUserId,
+            effectiveUserId: audit.effectiveUserId,
+            tenantId: audit.tenantId,
+            impersonation: audit.impersonation,
+            impersonatedTenantId: audit.impersonation ? audit.tenantId : null,
+          },
+        },
+        occurredAt: new Date(),
+        initiatedByUserId: audit.actorUserId,
+        processed: true,
+      },
     });
 
     return NextResponse.json({ ok: true, data });

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { requireAuth, isSuperAdmin } from "@/lib/auth-guard";
-import { resolveOrgId } from "@/lib/tenant";
 import { inviteMembershipSchema } from "@/lib/validations/membership-invite";
 import { inviteMember } from "@/lib/services/membership.service";
 import type { MembershipRole } from "@/lib/generated/prisma";
@@ -20,7 +19,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, fieldErrors }, { status: 422 });
     }
 
-    const orgId = resolveOrgId(guard, body.organizationId);
+    const orgId = guard.organizationId ?? "";
+    if (!orgId) {
+      return NextResponse.json({ ok: false, error: "Organization context required" }, { status: 400 });
+    }
 
     let orgStructure = guard.organizationStructure;
     if (isSuperAdmin(guard) && !orgStructure) {
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
       name: parsed.data.name,
       role: parsed.data.role as MembershipRole,
       unitId: parsed.data.unitId,
-      organizationId: orgId,
+      session: guard,
       organizationStructure: orgStructure,
       inviterRole: isSuperAdmin(guard) ? "ORG_ADMIN" : guard.role,
       inviterUnitPath: isSuperAdmin(guard) ? null : guard.unitPath,

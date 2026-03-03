@@ -37,6 +37,12 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
+    if (!user.password) {
+      return NextResponse.json(
+        { error: "Password change is unavailable for this account" },
+        { status: 400 },
+      );
+    }
 
     // Verify current password
     const isValid = await bcrypt.compare(currentPassword, user.password);

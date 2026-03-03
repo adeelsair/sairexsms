@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth, requireRole, isSuperAdmin } from "@/lib/auth-guard";
+import { resolveAuditActor } from "@/lib/audit/resolve-audit-actor";
 import {
   initiatePayment,
   PaymentServiceError,
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
   }
 
   try {
+    const auditActor = resolveAuditActor(guard);
     const body = await request.json();
     const { challanId, gateway, callbackUrl, cancelUrl } = body;
 
@@ -47,6 +49,7 @@ export async function POST(request: Request) {
       callbackUrl,
       cancelUrl,
       initiatedByUserId: guard.id,
+      auditActor,
     });
 
     emit("PaymentInitiated", orgId!, {
@@ -55,7 +58,7 @@ export async function POST(request: Request) {
       gateway: result.gateway,
       gatewayRef: result.gatewayRef,
       amount: 0,
-    }, guard.id).catch(() => {});
+    }, auditActor).catch(() => {});
 
     return NextResponse.json(result, { status: 201 });
   } catch (err) {

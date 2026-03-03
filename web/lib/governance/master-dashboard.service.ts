@@ -53,7 +53,7 @@ export async function getChainKpis(organizationId: string): Promise<ChainKpis> {
       }),
 
       prisma.student.count({
-        where: { organizationId, status: "ACTIVE" },
+        where: { organizationId },
       }),
 
       prisma.feeChallan.aggregate({
@@ -156,7 +156,7 @@ export async function getCampusComparison(
 
       prisma.student.groupBy({
         by: ["campusId"],
-        where: { organizationId, status: "ACTIVE" },
+        where: { organizationId },
         _count: true,
       }),
     ]);

@@ -8,7 +8,7 @@ import { applyRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
  * POST /api/auth/phone/verify
  *
  * Step 2 of passwordless login: verify OTP and return user + memberships.
- * The client then calls signIn("phone-otp", { userId }) to create the session.
+ * Session creation is handled by downstream join/claim flow.
  *
  * Body: { otpSessionId: string, code: string }
  * Returns: { success, userId, isNewUser, memberships }

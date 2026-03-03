@@ -39,9 +39,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const orgId = isSuperAdmin(guard)
-      ? (searchParams.get("orgId") ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json(

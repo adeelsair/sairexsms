@@ -33,11 +33,7 @@ export async function GET(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const requestedOrgId = searchParams.get("orgId");
-    const organizationId =
-      isSuperAdmin(guard) && requestedOrgId
-        ? requestedOrgId
-        : guard.organizationId;
+    const organizationId = guard.organizationId;
 
     if (!organizationId) {
       return NextResponse.json(

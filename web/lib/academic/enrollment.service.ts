@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { AuditActorContext } from "@/lib/audit/resolve-audit-actor";
 import type { EnrollmentStatus } from "@/lib/generated/prisma";
 import { requireActiveAcademicYear, assertYearOpen } from "./academic-year.service";
 import { emit } from "@/lib/events";
@@ -14,6 +15,7 @@ export interface EnrollStudentInput {
   sectionId?: string;
   rollNumber?: string;
   admissionDate?: Date;
+  auditActor?: AuditActorContext;
 }
 
 export interface TransferSectionInput {
@@ -131,7 +133,7 @@ export interface BulkEnrollStudentsInput {
 /* ── Enroll Student ─────────────────────────────────────── */
 
 export async function enrollStudent(input: EnrollStudentInput) {
-  const { organizationId, studentId, campusId, classId, sectionId } = input;
+  const { organizationId, studentId, campusId, classId, sectionId, auditActor } = input;
 
   return prisma.$transaction(async (tx) => {
     const activeYear = await requireActiveAcademicYear(organizationId);
@@ -172,7 +174,7 @@ export async function enrollStudent(input: EnrollStudentInput) {
       academicYearId: activeYear.id,
       classId,
       sectionId,
-    }).catch(() => {});
+    }, auditActor).catch(() => {});
     emitActionUpdated({
       orgId: organizationId,
       type: "ADMISSION_ENQUIRY",
@@ -765,6 +767,7 @@ export async function getEnrollmentStats(
   const [byStatus, byClass] = await prisma.$transaction([
     prisma.studentEnrollment.groupBy({
       by: ["status"],
+      orderBy: { status: "asc" },
       where: {
         organizationId: scope.organizationId,
         academicYearId,
@@ -774,6 +777,7 @@ export async function getEnrollmentStats(
     }),
     prisma.studentEnrollment.groupBy({
       by: ["classId"],
+      orderBy: { classId: "asc" },
       where: {
         organizationId: scope.organizationId,
         academicYearId,

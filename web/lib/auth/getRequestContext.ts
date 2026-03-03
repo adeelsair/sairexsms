@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin, requireAuth } from "@/lib/auth-guard";
+import { requireAuth } from "@/lib/auth-guard";
 
 export type RequestContext = {
   userId: string;
@@ -18,14 +18,7 @@ export async function getRequestContext(
   }
 
   const role = guard.platformRole ?? guard.role ?? "USER";
-  const requestedOrgId = request
-    ? new URL(request.url).searchParams.get("orgId")
-    : null;
-
-  const organizationId =
-    isSuperAdmin(guard) && requestedOrgId
-      ? requestedOrgId
-      : guard.organizationId;
+  const organizationId = guard.organizationId;
 
   if (!organizationId) {
     throw new Error("Organization context required");

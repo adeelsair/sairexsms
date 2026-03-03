@@ -14,6 +14,7 @@ generator jsClient {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 ////////////////////////////////////////////////////////////
@@ -294,11 +295,47 @@ model User {
   resetTokens       PasswordResetToken[]
   verificationCodes VerificationCode[]
   jobs              Job[]
+  sessions          Session[]
 
   auditActionsPerformed RbacAuditLog[] @relation("AuditActor")
   auditActionsReceived  RbacAuditLog[] @relation("AuditTarget")
   postingRuns           PostingRun[]
   promotionRuns         PromotionRun[]
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       Int
+  expires      DateTime
+
+  organizationId        String?  @db.VarChar(11)
+  campusId              Int?
+  membershipId          Int?
+  organizationStructure String?
+  unitPath              String?
+  role                  String?
+  platformRole          String?
+
+  impersonation             Boolean   @default(false)
+  impersonationOriginalUserId Int?
+  impersonationEffectiveUserId Int?
+  impersonationTenantId       String? @db.VarChar(11)
+  impersonationExpiresAt      DateTime?
+
+  originalOrganizationId        String? @db.VarChar(11)
+  originalCampusId              Int?
+  originalMembershipId          Int?
+  originalOrganizationStructure String?
+  originalUnitPath              String?
+  originalRole                  String?
+  originalPlatformRole          String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([expires])
 }
 
 ////////////////////////////////////////////////////////////
@@ -672,8 +709,26 @@ model Organization {
   controlPolicy      OrganizationControlPolicy?
   feeTemplates       FeeTemplate[]
   campusHealthScores CampusHealthScore[]
+  dailyStats         OrganizationDailyStats[]
 
   @@index([status])
+}
+
+model OrganizationDailyStats {
+  organizationId    String   @db.VarChar(11)
+  date              DateTime
+  studentCount      Int      @default(0)
+  totalRevenue      Float    @default(0)
+  attendanceCount   Int      @default(0)
+  challanCount      Int      @default(0)
+  outstandingAmount Float    @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, date])
+  @@index([organizationId])
 }
 
 ////////////////////////////////////////////////////////////

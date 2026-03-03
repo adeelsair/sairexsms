@@ -25,12 +25,6 @@ function normalizeString(val: string): string {
 
 export const createOrganizationAddressSchema = z
   .object({
-    organizationId: z
-      .string()
-      .min(1, "Organization ID is required")
-      .max(11)
-      .regex(/^ORG-\d{5}$/, "Organization ID must be in format ORG-00001"),
-
     type: z.enum(ADDRESS_TYPE, {
       message: "Address type must be one of: HEAD_OFFICE, BILLING, CAMPUS, OTHER",
     }),

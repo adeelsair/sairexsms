@@ -168,7 +168,7 @@ export async function getOrganizationPlan(organizationId: string): Promise<{
   const expired = plan.expiresAt ? new Date() > plan.expiresAt : false;
   const trialEndsAt = plan.trialEndsAt ?? null;
   const trialActive =
-    Boolean(trialEndsAt) &&
+    trialEndsAt !== null &&
     !expired &&
     plan.active &&
     new Date() <= trialEndsAt;

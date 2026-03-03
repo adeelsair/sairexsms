@@ -1,8 +1,11 @@
 import { prisma } from "@/lib/prisma";
-import type { PaymentChannel, Prisma } from "@/lib/generated/prisma";
+import type { AuditActorContext } from "@/lib/audit/resolve-audit-actor";
+import { Prisma } from "@/lib/generated/prisma";
+import type { PaymentChannel } from "@/lib/generated/prisma";
 import { emit } from "@/lib/events";
 import { logger } from "@/lib/logger";
 import { emitActionUpdated } from "@/lib/events/action-events";
+import { incrementDailyRevenue } from "@/lib/performance/organization-daily-stats.service";
 
 /* ── Types ──────────────────────────────────────────────── */
 
@@ -17,18 +20,21 @@ export interface RecordPaymentInput {
   challanId?: number;
   idempotencyKey?: string;
   rawPayload?: Record<string, unknown>;
+  auditActor?: AuditActorContext;
 }
 
 export interface ReconcileInput {
   paymentRecordId: string;
   challanId: number;
   organizationId: string;
+  auditActor?: AuditActorContext;
 }
 
 export interface ReverseInput {
   paymentRecordId: string;
   organizationId: string;
   reason: string;
+  auditActor?: AuditActorContext;
 }
 
 export interface ReconciliationResult {
@@ -42,6 +48,52 @@ export interface ReconciliationResult {
 /* ── Summary Helper ─────────────────────────────────────── */
 
 type TxClient = Prisma.TransactionClient;
+
+type AtomicChallanApplyResult = {
+  id: number;
+  studentId: number;
+  campusId: number;
+  paidAmount: Prisma.Decimal;
+  totalAmount: Prisma.Decimal;
+  status: string;
+};
+
+async function applyPaymentToChallanAtomically(
+  tx: TxClient,
+  input: {
+    challanId: number;
+    organizationId: string;
+    amount: number;
+  },
+): Promise<AtomicChallanApplyResult> {
+  const rows = await tx.$queryRaw<AtomicChallanApplyResult[]>(Prisma.sql`
+    UPDATE "FeeChallan"
+    SET
+      "paidAmount" = "paidAmount" + ${input.amount},
+      "status" = CASE
+        WHEN ("paidAmount" + ${input.amount}) >= "totalAmount"
+          THEN 'PAID'::"ChallanStatus"
+        ELSE 'PARTIALLY_PAID'::"ChallanStatus"
+      END,
+      "paidAt" = CASE
+        WHEN ("paidAmount" + ${input.amount}) >= "totalAmount"
+          THEN NOW()
+        ELSE "paidAt"
+      END
+    WHERE
+      "id" = ${input.challanId}
+      AND "organizationId" = ${input.organizationId}
+      AND "status" <> 'CANCELLED'::"ChallanStatus"
+      AND ("totalAmount" - "paidAmount") >= ${input.amount}
+    RETURNING "id", "studentId", "campusId", "paidAmount", "totalAmount", "status"
+  `);
+
+  if (rows.length === 0) {
+    throw new ReconciliationError("Challan is already fully paid or payment exceeds remaining balance");
+  }
+
+  return rows[0];
+}
 
 async function adjustSummary(
   tx: TxClient,
@@ -99,7 +151,9 @@ export async function recordPayment(input: RecordPaymentInput) {
       paymentChannel,
       paidAt,
       challanId: challanId ?? null,
-      rawPayload: rawPayload ?? undefined,
+      rawPayload: rawPayload
+        ? (rawPayload as unknown as Prisma.InputJsonValue)
+        : undefined,
     },
   });
 }
@@ -109,7 +163,7 @@ export async function recordPayment(input: RecordPaymentInput) {
 export async function reconcilePayment(
   input: ReconcileInput,
 ): Promise<ReconciliationResult> {
-  const { paymentRecordId, challanId, organizationId } = input;
+  const { paymentRecordId, challanId, organizationId, auditActor } = input;
   logger.info({ paymentRecordId, challanId, orgId: organizationId }, "Reconciliation started");
 
   return prisma.$transaction(async (tx) => {
@@ -127,31 +181,14 @@ export async function reconcilePayment(
       );
     }
 
-    const challan = await tx.feeChallan.findUniqueOrThrow({
-      where: { id: challanId },
-    });
-
-    if (challan.organizationId !== organizationId) {
-      throw new ReconciliationError("Challan does not belong to this organization");
-    }
-
-    if (challan.status === "CANCELLED") {
-      throw new ReconciliationError("Cannot reconcile against a cancelled challan");
-    }
-
     const paymentAmt = Number(payment.amount);
-    const newPaidAmount = Number(challan.paidAmount) + paymentAmt;
-    const isPaidInFull = newPaidAmount >= Number(challan.totalAmount);
-    const newStatus = isPaidInFull ? ("PAID" as const) : ("PARTIALLY_PAID" as const);
-
-    await tx.feeChallan.update({
-      where: { id: challan.id },
-      data: {
-        paidAmount: newPaidAmount,
-        status: newStatus,
-        paidAt: isPaidInFull ? new Date() : challan.paidAt,
-      },
+    const challan = await applyPaymentToChallanAtomically(tx, {
+      challanId,
+      organizationId,
+      amount: paymentAmt,
     });
+    const newPaidAmount = Number(challan.paidAmount);
+    const newStatus = challan.status;
 
     await tx.paymentRecord.update({
       where: { id: payment.id },
@@ -176,6 +213,11 @@ export async function reconcilePayment(
     });
 
     await adjustSummary(tx, challan.studentId, organizationId, challan.campusId, "CREDIT", paymentAmt);
+    await incrementDailyRevenue(tx, {
+      organizationId,
+      amount: paymentAmt,
+      date: payment.paidAt ?? new Date(),
+    });
 
     const result: ReconciliationResult = {
       paymentRecordId: payment.id,
@@ -196,7 +238,7 @@ export async function reconcilePayment(
       challanStatus: newStatus,
       newPaidAmount,
       ledgerEntryId: ledgerEntry.id,
-    }).catch(() => {});
+    }, auditActor).catch(() => {});
     emitActionUpdated({
       orgId: organizationId,
       type: "FEE_COLLECTION",
@@ -222,20 +264,15 @@ export async function recordAndReconcile(
     challanId,
     idempotencyKey,
     rawPayload,
+    auditActor,
   } = input;
 
-  const result = await prisma.$transaction(async (tx) => {
-    const challan = await tx.feeChallan.findUniqueOrThrow({
-      where: { id: challanId },
+  const txResult = await prisma.$transaction(async (tx) => {
+    const challan = await applyPaymentToChallanAtomically(tx, {
+      challanId,
+      organizationId,
+      amount,
     });
-
-    if (challan.organizationId !== organizationId) {
-      throw new ReconciliationError("Challan does not belong to this organization");
-    }
-
-    if (challan.status === "CANCELLED") {
-      throw new ReconciliationError("Cannot reconcile against a cancelled challan");
-    }
 
     const payment = await tx.paymentRecord.create({
       data: {
@@ -250,22 +287,14 @@ export async function recordAndReconcile(
         paidAt,
         challanId,
         status: "RECONCILED",
-        rawPayload: rawPayload ?? undefined,
+        rawPayload: rawPayload
+          ? (rawPayload as unknown as Prisma.InputJsonValue)
+          : undefined,
       },
     });
 
-    const newPaidAmount = Number(challan.paidAmount) + amount;
-    const isPaidInFull = newPaidAmount >= Number(challan.totalAmount);
-    const newStatus = isPaidInFull ? ("PAID" as const) : ("PARTIALLY_PAID" as const);
-
-    await tx.feeChallan.update({
-      where: { id: challan.id },
-      data: {
-        paidAmount: newPaidAmount,
-        status: newStatus,
-        paidAt: isPaidInFull ? new Date() : challan.paidAt,
-      },
-    });
+    const newPaidAmount = Number(challan.paidAmount);
+    const newStatus = challan.status;
 
     const ledgerEntry = await tx.ledgerEntry.create({
       data: {
@@ -282,6 +311,11 @@ export async function recordAndReconcile(
     });
 
     await adjustSummary(tx, challan.studentId, organizationId, challan.campusId, "CREDIT", amount);
+    await incrementDailyRevenue(tx, {
+      organizationId,
+      amount,
+      date: paidAt,
+    });
 
     return {
       paymentRecordId: payment.id,
@@ -289,13 +323,34 @@ export async function recordAndReconcile(
       challanStatus: newStatus,
       newPaidAmount,
       ledgerEntryId: ledgerEntry.id,
+      studentId: challan.studentId,
+      campusId: challan.campusId,
+      amount,
     };
   });
+
+  const result: ReconciliationResult = {
+    paymentRecordId: txResult.paymentRecordId,
+    challanId: txResult.challanId,
+    challanStatus: txResult.challanStatus,
+    newPaidAmount: txResult.newPaidAmount,
+    ledgerEntryId: txResult.ledgerEntryId,
+  };
 
   emitActionUpdated({
     orgId: organizationId,
     type: "FEE_COLLECTION",
   });
+  emit("PaymentReconciled", organizationId, {
+    paymentRecordId: txResult.paymentRecordId,
+    challanId: txResult.challanId,
+    studentId: txResult.studentId,
+    campusId: txResult.campusId,
+    amount: txResult.amount,
+    challanStatus: txResult.challanStatus,
+    newPaidAmount: txResult.newPaidAmount,
+    ledgerEntryId: txResult.ledgerEntryId,
+  }, auditActor).catch(() => {});
 
   return result;
 }
@@ -305,7 +360,7 @@ export async function recordAndReconcile(
 export async function reversePayment(
   input: ReverseInput,
 ): Promise<{ ledgerEntryId: string }> {
-  const { paymentRecordId, organizationId, reason } = input;
+  const { paymentRecordId, organizationId, reason, auditActor } = input;
 
   return prisma.$transaction(async (tx) => {
     const payment = await tx.paymentRecord.findUniqueOrThrow({
@@ -371,6 +426,31 @@ export async function reversePayment(
     if (studentId && campusId) {
       await adjustSummary(tx, studentId, organizationId, campusId, "DEBIT", refundAmt);
     }
+    const statsDate = new Date(
+      Date.UTC(
+        (payment.paidAt ?? new Date()).getUTCFullYear(),
+        (payment.paidAt ?? new Date()).getUTCMonth(),
+        (payment.paidAt ?? new Date()).getUTCDate(),
+      ),
+    );
+    await tx.organizationDailyStats.upsert({
+      where: {
+        organizationId_date: {
+          organizationId,
+          date: statsDate,
+        },
+      },
+      update: {
+        totalRevenue: { decrement: refundAmt },
+        outstandingAmount: { increment: refundAmt },
+      },
+      create: {
+        organizationId,
+        date: statsDate,
+        totalRevenue: 0,
+        outstandingAmount: refundAmt,
+      },
+    });
 
     emit("PaymentReversed", organizationId, {
       paymentRecordId: payment.id,
@@ -378,7 +458,7 @@ export async function reversePayment(
       studentId: studentId ?? 0,
       amount: refundAmt,
       reason,
-    }).catch(() => {});
+    }, auditActor).catch(() => {});
 
     return { ledgerEntryId: ledgerEntry.id };
   });

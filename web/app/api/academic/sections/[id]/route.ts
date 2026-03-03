@@ -27,9 +27,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     const { id } = await context.params;
     const body = (await request.json()) as Record<string, unknown>;
 
-    const orgId = isSuperAdmin(guard)
-      ? ((body.orgId as string) ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json(
@@ -85,9 +83,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
 
-    const orgId = isSuperAdmin(guard)
-      ? (new URL(_request.url).searchParams.get("orgId") ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json(

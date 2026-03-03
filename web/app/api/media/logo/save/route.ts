@@ -5,7 +5,6 @@ import { requireAuth } from "@/lib/auth-guard";
 import { resolveOrgId } from "@/lib/tenant";
 
 const schema = z.object({
-  organizationId: z.string().optional(),
   url: z.string().url("Invalid URL"),
   key: z.string().min(1, "Storage key is required"),
   size: z.number().positive(),
@@ -33,7 +32,7 @@ export async function POST(request: Request) {
     }
 
     const { url, key, size, mimeType, originalName } = parsed.data;
-    const orgId = resolveOrgId(guard, parsed.data.organizationId);
+    const orgId = resolveOrgId(guard);
 
     const [asset] = await prisma.$transaction([
       prisma.mediaAsset.create({

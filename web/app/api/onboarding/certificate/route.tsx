@@ -13,19 +13,18 @@ function generateCertNo(orgId: string, createdAt: Date): string {
 }
 
 /**
- * GET /api/onboarding/certificate?orgId=ORG-00002
+ * GET /api/onboarding/certificate
  * Streams a 2-page landscape PDF: Registration Certificate + Organization Profile.
  * Source of truth is always the database.
  */
-export async function GET(request: Request) {
+export async function GET() {
   const guard = await requireVerifiedAuth();
   if (guard instanceof NextResponse) return guard;
 
-  const { searchParams } = new URL(request.url);
-  const orgId = searchParams.get("orgId");
+  const orgId = guard.organizationId;
 
   if (!orgId) {
-    return NextResponse.json({ error: "orgId is required" }, { status: 400 });
+    return NextResponse.json({ error: "Organization context required" }, { status: 400 });
   }
 
   try {
@@ -70,8 +69,9 @@ export async function GET(request: Request) {
     const buffer = await renderToBuffer(
       <RegistrationPDF org={org} qrDataUrl={qrDataUrl} verifyUrl={verifyUrl} />,
     );
+    const body = Uint8Array.from(buffer);
 
-    return new NextResponse(buffer, {
+    return new NextResponse(body, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="${orgId}.pdf"`,

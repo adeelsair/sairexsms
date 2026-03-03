@@ -58,8 +58,8 @@ export async function POST(request: Request) {
         postalCode: parsed.data.postalCode || null,
         organizationEmail: parsed.data.organizationEmail,
         organizationPhone: parsed.data.organizationPhone,
+        organizationMobile: parsed.data.organizationMobile,
         organizationWhatsApp: parsed.data.organizationWhatsApp || null,
-        websiteUrl: parsed.data.websiteUrl || null,
         onboardingStep: "CONTACT_ADDRESS",
       },
     });

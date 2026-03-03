@@ -356,13 +356,14 @@ function buildOrganizationRows(
           )
         : risk;
       const riskTrend = compareRiskDirection(risk, previousRisk);
+      const planType = (cycle.organization.plan?.planType ?? "UNASSIGNED") as OrganizationRevenueRow["planType"];
 
       return {
         organizationId: cycle.organizationId,
         organizationName: cycle.organization.organizationName,
         students: cycle.totalStudents,
         mode: cycle.revenueCalculationModeUsed,
-        planType: cycle.organization.plan?.planType ?? "UNASSIGNED",
+        planType,
         revenue: Number(cycle.sairexRevenue),
         collectedPercent,
         status,

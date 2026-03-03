@@ -149,9 +149,9 @@ export async function POST(request: Request) {
     const jobId = await enqueue({
       type: dispatchType,
       queue: TYPE_TO_QUEUE[dispatchType],
-      payload: { ...payload, organizationId: orgId, userId: guard.userId },
+      payload: { ...payload, organizationId: orgId, userId: guard.id },
       organizationId: orgId,
-      userId: guard.userId,
+      userId: guard.id,
       priority: priority ?? 0,
       maxAttempts: TYPE_MAX_ATTEMPTS[dispatchType],
       idempotencyKey: idempotencyKey ?? undefined,

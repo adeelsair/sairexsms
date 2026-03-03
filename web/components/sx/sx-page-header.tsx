@@ -4,6 +4,7 @@ interface SxPageHeaderProps {
   title: string;
   subtitle?: string;
   actions?: React.ReactNode;
+  children?: React.ReactNode;
   className?: string;
 }
 
@@ -11,8 +12,11 @@ export function SxPageHeader({
   title,
   subtitle,
   actions,
+  children,
   className,
 }: SxPageHeaderProps) {
+  const headerActions = actions ?? children;
+
   return (
     <div
       className={cn(
@@ -31,8 +35,8 @@ export function SxPageHeader({
         )}
       </div>
 
-      {actions && (
-        <div className="flex shrink-0 items-center gap-2">{actions}</div>
+      {headerActions && (
+        <div className="flex shrink-0 items-center gap-2">{headerActions}</div>
       )}
     </div>
   );

@@ -83,7 +83,6 @@ export async function POST(request: Request) {
 
     const account = await createBankAccount(
       profile.id,
-      profile.organizationId,
       bankData,
     );
     return NextResponse.json({ ok: true, data: account }, { status: 201 });

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -42,13 +41,15 @@ export default function CompletePage() {
       return;
     }
 
-    const signInResult = await signIn("credentials", {
-      email: result.data.adminEmail,
-      password: draft.adminSetup.password,
-      redirect: false,
-    });
+    const signInResult = await api.post<{ ok: boolean; user: { id: string } }>(
+      "/api/auth/local-login",
+      {
+        email: result.data.adminEmail,
+        password: draft.adminSetup.password,
+      },
+    );
 
-    if (signInResult?.error) {
+    if (!signInResult.ok) {
       setIsFinishing(false);
       toast.error("Setup complete. Please login manually.");
       router.push("/login");

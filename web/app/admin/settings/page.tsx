@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { KeyRound, Palette } from "lucide-react";
 import { SxButton, SxPageHeader } from "@/components/sx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +19,11 @@ interface OrganizationModeResponse {
 }
 
 export default function SettingsPage() {
+  const { data: session } = useSession();
   const [currentMode, setCurrentMode] = useState<"SIMPLE" | "PRO" | null>(null);
+  const isImpersonating = Boolean(
+    (session?.user as { impersonation?: boolean } | undefined)?.impersonation,
+  );
 
   useEffect(() => {
     let active = true;
@@ -64,30 +69,34 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card className="border-border">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-foreground">
-            <Palette className="h-4 w-4" />
-            Theme mode
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ThemeToggle />
-        </CardContent>
-      </Card>
+      {!isImpersonating ? (
+        <>
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-foreground">
+                <Palette className="h-4 w-4" />
+                Theme mode
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ThemeToggle />
+            </CardContent>
+          </Card>
 
-      <Card className="border-border">
-        <CardHeader>
-          <CardTitle className="text-foreground">Organization mode</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {currentMode ? (
-            <ModeToggleButton currentMode={currentMode} />
-          ) : (
-            <p className="text-sm text-muted-foreground">Mode control is unavailable for this account.</p>
-          )}
-        </CardContent>
-      </Card>
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle className="text-foreground">Organization mode</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {currentMode ? (
+                <ModeToggleButton currentMode={currentMode} />
+              ) : (
+                <p className="text-sm text-muted-foreground">Mode control is unavailable for this account.</p>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
     </div>
   );
 }

@@ -6,6 +6,10 @@ import {
   QRInviteError,
 } from "@/lib/adoption/qr-invite.service";
 import { applyRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import {
+  attachSessionCookie,
+  issueSessionForUserId,
+} from "@/lib/auth/session-issuer";
 
 const claimInviteSchema = z.object({
   token: z.string().min(1),
@@ -41,7 +45,17 @@ export async function POST(request: Request) {
       admissionNo: parsed.data.admissionNo,
     });
 
-    return NextResponse.json(result, { status: 201 });
+    const issued = await issueSessionForUserId(result.userId);
+    if (!issued) {
+      return NextResponse.json(
+        { error: "Joined but could not create session" },
+        { status: 500 },
+      );
+    }
+
+    const response = NextResponse.json(result, { status: 201 });
+    attachSessionCookie(response, issued.sessionToken, issued.expires);
+    return response;
   } catch (error) {
     if (error instanceof QRInviteError) {
       const statusByCode: Record<string, number> = {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth, requireRole, isSuperAdmin } from "@/lib/auth-guard";
+import { resolveAuditActor } from "@/lib/audit/resolve-audit-actor";
 import {
   enrollStudent,
   listEnrollments,
@@ -28,9 +29,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
 
-    const orgId = isSuperAdmin(guard)
-      ? (searchParams.get("orgId") ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json(
@@ -153,11 +152,10 @@ export async function POST(request: Request) {
   if (roleCheck) return roleCheck;
 
   try {
+    const auditActor = resolveAuditActor(guard);
     const body = (await request.json()) as Record<string, unknown>;
 
-    const orgId = isSuperAdmin(guard)
-      ? ((body.orgId as string) ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json(
@@ -230,6 +228,7 @@ export async function POST(request: Request) {
       sectionId: body.sectionId as string | undefined,
       rollNumber: body.rollNumber as string | undefined,
       admissionDate: body.admissionDate ? new Date(body.admissionDate as string) : undefined,
+      auditActor,
     });
 
     return NextResponse.json({ ok: true, data: enrollment }, { status: 201 });

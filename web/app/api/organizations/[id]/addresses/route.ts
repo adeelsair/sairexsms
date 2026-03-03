@@ -1,24 +1,24 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireRole } from "@/lib/auth-guard";
-import { assertOwnership } from "@/lib/tenant";
 import {
   createOrganizationAddressSchema,
   updateOrganizationAddressSchema,
 } from "@/lib/validations";
 
-type RouteContext = { params: Promise<{ id: string }> };
-
 // ─── GET: List addresses for an organization ─────────────────────────────────
 
-export async function GET(request: Request, ctx: RouteContext) {
+export async function GET() {
   const guard = await requireAuth();
   if (guard instanceof NextResponse) return guard;
 
-  const { id: orgId } = await ctx.params;
-
-  const ownershipError = assertOwnership(guard, orgId);
-  if (ownershipError) return ownershipError;
+  const orgId = guard.organizationId;
+  if (!orgId) {
+    return NextResponse.json(
+      { error: "Organization context required" },
+      { status: 400 }
+    );
+  }
 
   try {
     const addresses = await prisma.organizationAddress.findMany({
@@ -38,25 +38,25 @@ export async function GET(request: Request, ctx: RouteContext) {
 
 // ─── POST: Create a new address ──────────────────────────────────────────────
 
-export async function POST(request: Request, ctx: RouteContext) {
+export async function POST(request: Request) {
   const guard = await requireAuth();
   if (guard instanceof NextResponse) return guard;
 
   const denied = requireRole(guard, "SUPER_ADMIN", "ORG_ADMIN");
   if (denied) return denied;
 
-  const { id: orgId } = await ctx.params;
-
-  const ownershipError = assertOwnership(guard, orgId);
-  if (ownershipError) return ownershipError;
+  const orgId = guard.organizationId;
+  if (!orgId) {
+    return NextResponse.json(
+      { error: "Organization context required" },
+      { status: 400 }
+    );
+  }
 
   try {
     const body = await request.json();
 
-    const parsed = createOrganizationAddressSchema.safeParse({
-      ...body,
-      organizationId: orgId,
-    });
+    const parsed = createOrganizationAddressSchema.safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json(
@@ -77,7 +77,10 @@ export async function POST(request: Request, ctx: RouteContext) {
     }
 
     const address = await prisma.organizationAddress.create({
-      data: parsed.data,
+      data: {
+        ...parsed.data,
+        organizationId: orgId,
+      },
     });
 
     return NextResponse.json(address, { status: 201 });
@@ -92,17 +95,20 @@ export async function POST(request: Request, ctx: RouteContext) {
 
 // ─── PUT: Update an existing address ─────────────────────────────────────────
 
-export async function PUT(request: Request, ctx: RouteContext) {
+export async function PUT(request: Request) {
   const guard = await requireAuth();
   if (guard instanceof NextResponse) return guard;
 
   const denied = requireRole(guard, "SUPER_ADMIN", "ORG_ADMIN");
   if (denied) return denied;
 
-  const { id: orgId } = await ctx.params;
-
-  const ownershipError = assertOwnership(guard, orgId);
-  if (ownershipError) return ownershipError;
+  const orgId = guard.organizationId;
+  if (!orgId) {
+    return NextResponse.json(
+      { error: "Organization context required" },
+      { status: 400 }
+    );
+  }
 
   try {
     const body = await request.json();
@@ -171,17 +177,20 @@ export async function PUT(request: Request, ctx: RouteContext) {
 
 // ─── DELETE: Remove an address ───────────────────────────────────────────────
 
-export async function DELETE(request: Request, ctx: RouteContext) {
+export async function DELETE(request: Request) {
   const guard = await requireAuth();
   if (guard instanceof NextResponse) return guard;
 
   const denied = requireRole(guard, "SUPER_ADMIN", "ORG_ADMIN");
   if (denied) return denied;
 
-  const { id: orgId } = await ctx.params;
-
-  const ownershipError = assertOwnership(guard, orgId);
-  if (ownershipError) return ownershipError;
+  const orgId = guard.organizationId;
+  if (!orgId) {
+    return NextResponse.json(
+      { error: "Organization context required" },
+      { status: 400 }
+    );
+  }
 
   try {
     const { searchParams } = new URL(request.url);

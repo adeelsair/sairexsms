@@ -124,10 +124,17 @@ export async function listBankAccounts(profileId: string) {
 
 export async function createBankAccount(
   profileId: string,
-  organizationId: string,
   data: Omit<CreateUnitBankInput, "unitType" | "unitId">,
 ) {
   return prisma.$transaction(async (tx) => {
+    const profile = await tx.unitProfile.findUnique({
+      where: { id: profileId },
+      select: { organizationId: true },
+    });
+    if (!profile) {
+      throw new Error("Unit profile not found");
+    }
+
     if (data.isPrimary) {
       await tx.unitBankAccount.updateMany({
         where: { unitProfileId: profileId, isPrimary: true },
@@ -138,7 +145,7 @@ export async function createBankAccount(
       data: {
         ...data,
         unitProfileId: profileId,
-        organizationId,
+        organizationId: profile.organizationId,
       },
     });
   });

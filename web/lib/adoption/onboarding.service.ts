@@ -13,6 +13,7 @@
  *   5. Review & Complete (mark done, redirect to dashboard)
  */
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 /* ── Wizard Steps ──────────────────────────────────────── */
 
@@ -97,6 +98,7 @@ export async function completeWizardStep(
   const mergedMetadata = stepMetadata
     ? { ...existingMetadata, [stepKey]: stepMetadata }
     : existingMetadata;
+  const metadataJson = mergedMetadata as Prisma.InputJsonValue;
 
   const record = await prisma.onboardingProgress.upsert({
     where: { organizationId },
@@ -105,13 +107,13 @@ export async function completeWizardStep(
       currentStep: nextStep,
       stepsCompleted: currentCompleted,
       completed: allComplete,
-      metadata: mergedMetadata,
+      metadata: metadataJson,
     },
     update: {
       currentStep: existing ? Math.max(existing.currentStep, nextStep) : nextStep,
       stepsCompleted: currentCompleted,
       completed: allComplete,
-      metadata: mergedMetadata,
+      metadata: metadataJson,
     },
   });
 

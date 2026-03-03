@@ -417,7 +417,7 @@ export default function UsersPage() {
         <div className="rounded-xl border border-border bg-surface p-4">
           <SxDataTable
             columns={userColumns}
-            data={filteredUsers as unknown as Record<string, unknown>[]}
+            data={filteredUsers}
             rowKey={(row, index) =>
               `${row.id}-${row.email}-${row.organization?.id ?? "org"}-${row.campusId ?? "campus"}-${index}`
             }
@@ -440,7 +440,7 @@ export default function UsersPage() {
           <div className="rounded-xl border border-border bg-surface p-4">
             <SxDataTable
               columns={inviteColumns}
-              data={invites as unknown as Record<string, unknown>[]}
+              data={invites}
               emptyMessage="No pending invites"
             />
           </div>

@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-guard";
+import { resolveAuditActor } from "@/lib/audit/resolve-audit-actor";
 import {
   scopeFilter,
   resolveOrgId,
   validateCrossRefs,
   assertOwnership,
 } from "@/lib/tenant";
+import {
+  incrementDailyChallanCount,
+  incrementDailyRevenue,
+} from "@/lib/performance/organization-daily-stats.service";
 
 // 1. GET: Fetch recent challans (tenant-scoped)
 export async function GET() {
@@ -38,13 +43,14 @@ export async function GET() {
 export async function POST(request: Request) {
   const guard = await requireAuth();
   if (guard instanceof NextResponse) return guard;
+  const audit = resolveAuditActor(guard);
 
   try {
     const body = await request.json();
     const { campusId, targetGrade, billingMonth, dueDate } = body;
 
     // Use session orgId (tenant boundary enforced)
-    const orgId = resolveOrgId(guard, body.organizationId);
+    const orgId = resolveOrgId(guard);
     const parsedCampusId = parseInt(campusId);
 
     // Cross-reference validation: ensure campus belongs to the same org
@@ -109,17 +115,78 @@ export async function POST(request: Request) {
       });
 
       if (!existing) {
-        await prisma.feeChallan.create({
-          data: {
+        await prisma.$transaction(async (tx) => {
+          const created = await tx.feeChallan.create({
+            data: {
+              organizationId: orgId,
+              campusId: parsedCampusId,
+              studentId: student.id,
+              challanNo,
+              dueDate: new Date(dueDate),
+              totalAmount: totalBillAmount,
+              status: "UNPAID",
+              generatedBy: guard.email,
+            },
+          });
+
+          await tx.ledgerEntry.create({
+            data: {
+              organizationId: orgId,
+              studentId: student.id,
+              campusId: parsedCampusId,
+              challanId: created.id,
+              entryType: "CHALLAN_CREATED",
+              direction: "DEBIT",
+              amount: totalBillAmount,
+              referenceId: String(created.id),
+              referenceType: "FeeChallan",
+            },
+          });
+
+          await tx.studentFinancialSummary.upsert({
+            where: { studentId: student.id },
+            create: {
+              studentId: student.id,
+              organizationId: orgId,
+              campusId: parsedCampusId,
+              totalDebit: totalBillAmount,
+              totalCredit: 0,
+              balance: totalBillAmount,
+            },
+            update: {
+              totalDebit: { increment: totalBillAmount },
+              balance: { increment: totalBillAmount },
+            },
+          });
+          await incrementDailyChallanCount(tx, {
             organizationId: orgId,
-            campusId: parsedCampusId,
-            studentId: student.id,
-            challanNo,
-            dueDate: new Date(dueDate),
-            totalAmount: totalBillAmount,
-            status: "UNPAID",
-            generatedBy: guard.email,
-          },
+            outstandingAmount: totalBillAmount,
+          });
+
+          await tx.domainEventLog.create({
+            data: {
+              organizationId: orgId,
+              eventType: "ChallanCreated",
+              payload: {
+                challanId: created.id,
+                studentId: student.id,
+                campusId: parsedCampusId,
+                totalAmount: totalBillAmount,
+                dueDate: new Date(dueDate).toISOString(),
+                challanNo,
+                _audit: {
+                  actorUserId: audit.actorUserId,
+                  effectiveUserId: audit.effectiveUserId,
+                  tenantId: audit.tenantId,
+                  impersonation: audit.impersonation,
+                  impersonatedTenantId: audit.impersonation ? audit.tenantId : null,
+                },
+              },
+              occurredAt: new Date(),
+              initiatedByUserId: audit.actorUserId,
+              processed: true,
+            },
+          });
         });
         generatedCount++;
       }
@@ -174,14 +241,28 @@ export async function PUT(request: Request) {
       );
     }
 
-    const updatedChallan = await prisma.feeChallan.update({
-      where: { id: parseInt(challanId) },
-      data: {
-        status: "PAID",
-        paidAmount: challan.totalAmount,
-        paymentMethod,
-        paidAt: new Date(),
-      },
+    const receivedAmount = Math.max(
+      Number(challan.totalAmount) - Number(challan.paidAmount),
+      0,
+    );
+    const paidAt = new Date();
+    await prisma.$transaction(async (tx) => {
+      await tx.feeChallan.update({
+        where: { id: parseInt(challanId) },
+        data: {
+          status: "PAID",
+          paidAmount: challan.totalAmount,
+          paymentMethod,
+          paidAt,
+        },
+      });
+      if (receivedAmount > 0) {
+        await incrementDailyRevenue(tx, {
+          organizationId: challan.organizationId,
+          amount: receivedAmount,
+          date: paidAt,
+        });
+      }
     });
 
     return NextResponse.json({

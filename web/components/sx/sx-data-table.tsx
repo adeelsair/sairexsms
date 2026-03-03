@@ -26,13 +26,13 @@ export interface SxColumn<T> {
 }
 
 /* ── Props ──────────────────────────────────────────────────── */
-interface SxDataTableProps<T> {
-  columns: SxColumn<T>[];
-  data: T[];
+interface SxDataTableProps<TColumnRow extends object, TDataRow extends object = TColumnRow> {
+  columns: SxColumn<TColumnRow>[];
+  data: TDataRow[];
   /** Row click handler — enables pointer cursor */
-  onRowClick?: (row: T, index: number) => void;
+  onRowClick?: (row: TDataRow, index: number) => void;
   /** Unique key extractor, defaults to `(row as any).id ?? index` */
-  rowKey?: (row: T, index: number) => string | number;
+  rowKey?: (row: TDataRow, index: number) => string | number;
   /** Show loading skeleton rows */
   loading?: boolean;
   /** Message when data is empty */
@@ -40,7 +40,7 @@ interface SxDataTableProps<T> {
   className?: string;
 }
 
-export function SxDataTable<T extends Record<string, unknown>>({
+export function SxDataTable<TColumnRow extends object, TDataRow extends object = TColumnRow>({
   columns,
   data,
   onRowClick,
@@ -48,8 +48,13 @@ export function SxDataTable<T extends Record<string, unknown>>({
   loading = false,
   emptyMessage = "No records found.",
   className,
-}: SxDataTableProps<T>) {
-  const getKey = rowKey ?? ((row: T, i: number) => (row.id as string | number) ?? i);
+}: SxDataTableProps<TColumnRow, TDataRow>) {
+  const getKey =
+    rowKey ??
+    ((row: TDataRow, i: number) => {
+      const maybeId = (row as { id?: string | number }).id;
+      return maybeId ?? i;
+    });
   const seenRowKeys = new Set<string>();
 
   return (
@@ -133,8 +138,8 @@ export function SxDataTable<T extends Record<string, unknown>>({
                     )}
                   >
                     {col.render
-                      ? col.render(row, i)
-                      : (row[col.key] as React.ReactNode) ?? "—"}
+                      ? col.render(row as unknown as TColumnRow, i)
+                      : ((row as Record<string, unknown>)[col.key] as React.ReactNode) ?? "—"}
                   </TableCell>
                 ))}
               </TableRow>

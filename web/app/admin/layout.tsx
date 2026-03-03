@@ -74,6 +74,7 @@ export default async function AdminLayout({
     branding?.capabilities.customLogo && organizationBranding?.logoUrl
       ? organizationBranding.logoUrl
       : "/sairex-logo.png";
+  const shouldRoundSairexLogo = tenantLogoUrl.startsWith("/sairex-logo");
   const tenantName =
     organizationBranding?.displayName?.trim() ||
     organizationBranding?.organizationName?.trim() ||
@@ -118,7 +119,7 @@ export default async function AdminLayout({
             alt="Tenant logo"
             width={168}
             height={44}
-            className="h-11 w-auto object-contain"
+            className={`h-11 w-auto object-contain ${shouldRoundSairexLogo ? "rounded-md" : ""}`}
             priority
           />
         </div>
@@ -141,7 +142,7 @@ export default async function AdminLayout({
               alt="Tenant logo"
               width={320}
               height={88}
-              className="h-auto w-full object-contain"
+              className={`h-auto w-full object-contain ${shouldRoundSairexLogo ? "rounded-md" : ""}`}
               priority
             />
           </div>
@@ -187,7 +188,7 @@ export default async function AdminLayout({
                 alt="Tenant logo"
                 width={128}
                 height={32}
-                className="h-8 w-auto object-contain"
+                className={`h-8 w-auto object-contain ${shouldRoundSairexLogo ? "rounded-md" : ""}`}
               />
             </div>
           </div>

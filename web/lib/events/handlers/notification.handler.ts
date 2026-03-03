@@ -16,7 +16,7 @@ async function onPaymentReconciled(
 
   const student = await prisma.student.findUnique({
     where: { id: event.payload.studentId },
-    select: { fullName: true, parentPhone: true, parentEmail: true },
+    select: { fullName: true },
   });
 
   if (!student) return;
@@ -35,8 +35,8 @@ async function onPaymentReconciled(
     userId: event.initiatedByUserId,
     payload: {
       studentName: student.fullName,
-      parentEmail: student.parentEmail,
-      parentPhone: student.parentPhone,
+      parentEmail: undefined,
+      parentPhone: undefined,
       challanNo: challan.challanNo,
       totalAmount: String(event.payload.amount),
       dueDate: challan.dueDate?.toISOString() ?? "",
@@ -60,7 +60,7 @@ async function onChallanCreated(
 
   const student = await prisma.student.findUnique({
     where: { id: event.payload.studentId },
-    select: { fullName: true, parentPhone: true, parentEmail: true },
+    select: { fullName: true },
   });
 
   if (!student) return;
@@ -71,8 +71,8 @@ async function onChallanCreated(
     organizationId: event.organizationId,
     payload: {
       studentName: student.fullName,
-      parentEmail: student.parentEmail,
-      parentPhone: student.parentPhone,
+      parentEmail: undefined,
+      parentPhone: undefined,
       challanNo: event.payload.challanNo,
       totalAmount: String(event.payload.totalAmount),
       dueDate: event.payload.dueDate,

@@ -25,21 +25,15 @@ export async function GET(request: Request) {
 
     const where: Prisma.MembershipWhereInput = {};
 
-    if (isSuperAdmin(guard)) {
-      const orgId = searchParams.get("orgId");
-      if (orgId) {
-        where.organizationId = orgId;
-      }
-    } else {
-      where.organizationId = guard.organizationId!;
+    where.organizationId = guard.organizationId!;
 
-      if (
-        guard.organizationStructure !== "SINGLE" &&
-        guard.role !== "ORG_ADMIN" &&
-        guard.unitPath
-      ) {
-        where.unitPath = { startsWith: guard.unitPath };
-      }
+    if (
+      !isSuperAdmin(guard) &&
+      guard.organizationStructure !== "SINGLE" &&
+      guard.role !== "ORG_ADMIN" &&
+      guard.unitPath
+    ) {
+      where.unitPath = { startsWith: guard.unitPath };
     }
 
     if (role) {

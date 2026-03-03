@@ -63,7 +63,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const orgId = resolveOrgId(guard, body.organizationId);
+    const orgId = resolveOrgId(guard);
 
     const org = await prisma.organization.findUniqueOrThrow({
       where: { id: orgId },

@@ -141,7 +141,7 @@ export async function inviteMember(params: {
   name?: string;
   role: MembershipRole;
   unitId?: string;
-  organizationId: string;
+  session: { organizationId?: string | null };
   organizationStructure: string | null;
   inviterRole: string | null;
   inviterUnitPath: string | null;
@@ -154,7 +154,7 @@ export async function inviteMember(params: {
     name,
     role,
     unitId,
-    organizationId,
+    session,
     organizationStructure,
     inviterRole,
     inviterUnitPath,
@@ -162,6 +162,10 @@ export async function inviteMember(params: {
     ipAddress,
     userAgent,
   } = params;
+  const organizationId = session.organizationId ?? "";
+  if (!organizationId) {
+    throw new Error("Organization context required");
+  }
 
   validateRoleForStructure(role, organizationStructure);
 

@@ -213,21 +213,24 @@ async function cleanupFixture(fixture: Fixture) {
   }
 }
 
-describe("finance reconciliation golden integration", () => {
+const dbUrl = process.env.DATABASE_URL ?? "";
+const hasUsableDbUrl =
+  dbUrl.length > 0 &&
+  (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://")) &&
+  !dbUrl.includes("USER:PASSWORD") &&
+  !dbUrl.includes("<") &&
+  !dbUrl.includes("your_");
+
+const describeIfDb = hasUsableDbUrl ? describe : describe.skip;
+
+describeIfDb("finance reconciliation golden integration", () => {
   let fixture: Fixture | null = null;
-  const dbUrl = process.env.DATABASE_URL ?? "";
-  const hasUsableDbUrl =
-    dbUrl.length > 0 &&
-    !dbUrl.includes("USER:PASSWORD") &&
-    !dbUrl.includes("<") &&
-    !dbUrl.includes("your_");
-  const runIfDb = hasUsableDbUrl ? it : it.skip;
 
   beforeEach(async () => {
     fixture = await buildFixture();
   });
 
-  runIfDb("covers partial, full, and idempotency duplicate protection", async () => {
+  it("covers partial, full, and idempotency duplicate protection", async () => {
     const paymentDate = new Date("2026-02-24T00:00:00.000Z");
 
     const partial = await reconcilePayment({

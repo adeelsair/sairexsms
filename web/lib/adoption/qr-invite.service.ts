@@ -1,4 +1,5 @@
 import QRCode from "qrcode";
+import { Prisma } from "@prisma/client";
 
 import { verifyOtp } from "@/lib/adoption/otp.service";
 import { prisma } from "@/lib/prisma";
@@ -41,7 +42,9 @@ export async function generateQRInviteToken(input: {
       role: input.role,
       expiresAt,
       maxUses: input.maxUses ?? null,
-      metadata: (input.metadata ?? null) as object | null,
+      metadata: input.metadata
+        ? (input.metadata as Prisma.InputJsonValue)
+        : Prisma.JsonNull,
     },
     select: {
       id: true,

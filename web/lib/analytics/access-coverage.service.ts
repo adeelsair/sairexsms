@@ -109,7 +109,6 @@ export async function getAccessCoverage(
     staffAgg,
     adminAgg,
     revenueAgg,
-    unitNames,
   ] = await prisma.$transaction([
     /* 1 — All campuses (lightweight) */
     prisma.campus.findMany({
@@ -124,14 +123,16 @@ export async function getAccessCoverage(
     /* 2 — Student counts by campus */
     prisma.student.groupBy({
       by: ["campusId"],
-      _count: { _all: true },
+      orderBy: { campusId: "asc" },
+      _count: { campusId: true },
       where: { organizationId },
     }),
 
     /* 3 — Staff counts by campus (TEACHER, ACCOUNTANT, STAFF) */
     prisma.membership.groupBy({
       by: ["campusId"],
-      _count: { _all: true },
+      orderBy: { campusId: "asc" },
+      _count: { campusId: true },
       where: {
         organizationId,
         status: "ACTIVE",
@@ -143,7 +144,8 @@ export async function getAccessCoverage(
     /* 4 — Admin counts by unitPath */
     prisma.membership.groupBy({
       by: ["unitPath"],
-      _count: { _all: true },
+      orderBy: { unitPath: "asc" },
+      _count: { unitPath: true },
       where: {
         organizationId,
         status: "ACTIVE",
@@ -155,13 +157,12 @@ export async function getAccessCoverage(
     /* 5 — Revenue (paid) by campus */
     prisma.feeChallan.groupBy({
       by: ["campusId"],
+      orderBy: { campusId: "asc" },
       _sum: { paidAmount: true },
       where: { organizationId },
     }),
-
-    /* 6 — Unit names for the requested level */
-    resolveUnitNames(organizationId, level),
   ]);
+  const unitNames = await resolveUnitNames(organizationId, level);
 
   /* ── Build O(1) lookup maps from aggregates ────────────── */
 
@@ -170,28 +171,40 @@ export async function getAccessCoverage(
   const studentMap = new Map<number, number>();
   for (const row of studentAgg) {
     if (campusIdSet.has(row.campusId)) {
-      studentMap.set(row.campusId, row._count._all);
+      const count =
+        row._count && row._count !== true
+          ? (row._count.campusId ?? row._count._all ?? 0)
+          : 0;
+      studentMap.set(row.campusId, count);
     }
   }
 
   const staffMap = new Map<number, number>();
   for (const row of staffAgg) {
     if (row.campusId !== null && campusIdSet.has(row.campusId)) {
-      staffMap.set(row.campusId, row._count._all);
+      const count =
+        row._count && row._count !== true
+          ? (row._count.campusId ?? row._count._all ?? 0)
+          : 0;
+      staffMap.set(row.campusId, count);
     }
   }
 
   const revenueMap = new Map<number, number>();
   for (const row of revenueAgg) {
     if (campusIdSet.has(row.campusId)) {
-      revenueMap.set(row.campusId, Number(row._sum.paidAmount ?? 0));
+      revenueMap.set(row.campusId, Number(row._sum?.paidAmount ?? 0));
     }
   }
 
   const adminByPath = new Map<string, number>();
   for (const row of adminAgg) {
     if (row.unitPath) {
-      adminByPath.set(row.unitPath, row._count._all);
+      const count =
+        row._count && row._count !== true
+          ? (row._count.unitPath ?? row._count._all ?? 0)
+          : 0;
+      adminByPath.set(row.unitPath, count);
     }
   }
 

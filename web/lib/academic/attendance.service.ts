@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { AttendanceStatus } from "@/lib/generated/prisma";
 import { assertYearOpen } from "./academic-year.service";
 import { emitActionUpdated } from "@/lib/events/action-events";
+import { syncDailyAttendanceCount } from "@/lib/performance/organization-daily-stats.service";
 
 /* ── Types ──────────────────────────────────────────────── */
 
@@ -146,55 +147,98 @@ export async function bulkMarkAttendance(input: BulkMarkInput) {
 
   for (let i = 0; i < entries.length; i += MARK_BATCH) {
     const batch = entries.slice(i, i + MARK_BATCH);
+    const batchEnrollmentIds = batch.map((entry) => entry.enrollmentId);
 
-    await prisma.$transaction(async (tx) => {
-      for (const entry of batch) {
-        const enrollment = validEnrollmentMap.get(entry.enrollmentId)!;
-
-        const existing = await tx.attendance.findUnique({
-          where: {
-            enrollmentId_date: {
-              enrollmentId: entry.enrollmentId,
-              date: normalizedDate,
-            },
-          },
-        });
-
-        if (existing) {
-          await tx.attendance.update({
-            where: { id: existing.id },
-            data: {
-              status: entry.status,
-              remarks: entry.remarks,
-              markedById,
-            },
-          });
-          updated++;
-        } else {
-          await tx.attendance.create({
-            data: {
-              organizationId,
-              academicYearId,
-              campusId,
-              classId,
-              sectionId,
-              enrollmentId: entry.enrollmentId,
-              studentId: enrollment.studentId,
-              date: normalizedDate,
-              status: entry.status,
-              remarks: entry.remarks,
-              markedById,
-            },
-          });
-          created++;
-        }
-      }
+    const existingRows = await prisma.attendance.findMany({
+      where: {
+        organizationId,
+        sectionId,
+        date: normalizedDate,
+        enrollmentId: { in: batchEnrollmentIds },
+      },
+      select: { id: true, enrollmentId: true },
     });
+    const existingByEnrollmentId = new Map(
+      existingRows.map((row) => [row.enrollmentId, row.id]),
+    );
+
+    const createRows: Array<{
+      organizationId: string;
+      academicYearId: string;
+      campusId: number;
+      classId: string;
+      sectionId: string;
+      enrollmentId: string;
+      studentId: number;
+      date: Date;
+      status: AttendanceStatus;
+      remarks?: string;
+      markedById?: number;
+    }> = [];
+    const updateRows: Array<{
+      id: string;
+      status: AttendanceStatus;
+      remarks?: string;
+    }> = [];
+
+    for (const entry of batch) {
+      const existingId = existingByEnrollmentId.get(entry.enrollmentId);
+      if (existingId) {
+        updateRows.push({
+          id: existingId,
+          status: entry.status,
+          remarks: entry.remarks,
+        });
+      } else {
+        const enrollment = validEnrollmentMap.get(entry.enrollmentId)!;
+        createRows.push({
+          organizationId,
+          academicYearId,
+          campusId,
+          classId,
+          sectionId,
+          enrollmentId: entry.enrollmentId,
+          studentId: enrollment.studentId,
+          date: normalizedDate,
+          status: entry.status,
+          remarks: entry.remarks,
+          markedById,
+        });
+      }
+    }
+
+    if (createRows.length > 0) {
+      const createResult = await prisma.attendance.createMany({
+        data: createRows,
+        skipDuplicates: true,
+      });
+      created += createResult.count;
+    }
+
+    if (updateRows.length > 0) {
+      await Promise.all(
+        updateRows.map((row) =>
+          prisma.attendance.update({
+            where: { id: row.id },
+            data: {
+              status: row.status,
+              remarks: row.remarks,
+              markedById,
+            },
+          }),
+        ),
+      );
+      updated += updateRows.length;
+    }
   }
 
   emitActionUpdated({
     orgId: organizationId,
     type: "ABSENT_FOLLOWUP",
+  });
+  await syncDailyAttendanceCount({
+    organizationId,
+    date: normalizedDate,
   });
 
   return { created, updated, total: entries.length };
@@ -224,6 +268,10 @@ export async function updateAttendance(input: UpdateAttendanceInput) {
   emitActionUpdated({
     orgId: input.organizationId,
     type: "ABSENT_FOLLOWUP",
+  });
+  await syncDailyAttendanceCount({
+    organizationId: input.organizationId,
+    date: record.date,
   });
 
   return updated;

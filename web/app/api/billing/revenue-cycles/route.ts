@@ -10,14 +10,18 @@ import {
 } from "@/lib/billing/revenue-cycle.service";
 
 export async function GET(request: Request) {
-  const guard = await requireAuth();
+  const guard = await requireAuth(request);
   if (guard instanceof NextResponse) return guard;
+  if (guard.impersonation) {
+    return NextResponse.json(
+      { ok: false, error: "Billing routes are unavailable during impersonation" },
+      { status: 403 },
+    );
+  }
 
   try {
     const { searchParams } = new URL(request.url);
-    const orgId = isSuperAdmin(guard)
-      ? (searchParams.get("orgId") ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json(
@@ -56,17 +60,21 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const guard = await requireAuth();
+  const guard = await requireAuth(request);
   if (guard instanceof NextResponse) return guard;
+  if (guard.impersonation) {
+    return NextResponse.json(
+      { ok: false, error: "Billing routes are unavailable during impersonation" },
+      { status: 403 },
+    );
+  }
 
   const roleCheck = requireRole(guard, "SUPER_ADMIN", "ORG_ADMIN");
   if (roleCheck) return roleCheck;
 
   try {
     const body = (await request.json()) as Record<string, unknown>;
-    const orgId = isSuperAdmin(guard)
-      ? ((body.orgId as string) ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json(

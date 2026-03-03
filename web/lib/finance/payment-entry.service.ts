@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
+import type { AuditActorContext } from "@/lib/audit/resolve-audit-actor";
 import type { PaymentChannel } from "@/lib/generated/prisma";
 import { recordAndReconcile } from "./reconciliation.service";
 
@@ -47,6 +48,7 @@ export interface ManualPaymentInput {
   paymentChannel: PaymentChannel;
   referenceNumber?: string;
   notes?: string;
+  auditActor?: AuditActorContext;
 }
 
 export async function searchStudentsForPayments(
@@ -198,7 +200,7 @@ export async function listOutstandingChallansByStudent(
       totalAmount,
       paidAmount,
       balance: Math.max(totalAmount - paidAmount, 0),
-      status: challan.status,
+      status: challan.status as OutstandingChallanRow["status"],
     };
   });
 }
@@ -236,6 +238,12 @@ export async function reconcilePayment(input: ManualPaymentInput) {
     throw new PaymentEntryError("Payment amount cannot exceed challan balance");
   }
 
+  const inputDate = input.paymentDate.toISOString().slice(0, 10);
+  const todayDate = new Date().toISOString().slice(0, 10);
+  if (inputDate < todayDate) {
+    throw new PaymentEntryError("Backdated payment entries are not allowed");
+  }
+
   const idempotencyKey = buildManualPaymentIdempotencyKey({
     organizationId: input.organizationId,
     challanId: input.challanId,
@@ -268,6 +276,7 @@ export async function reconcilePayment(input: ManualPaymentInput) {
     transactionRef: input.referenceNumber,
     idempotencyKey,
     rawPayload: input.notes ? { notes: input.notes } : undefined,
+    auditActor: input.auditActor,
   });
 }
 

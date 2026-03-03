@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getQueue } from "./queues";
 import type { JobsOptions } from "bullmq";
+import type { Prisma } from "@/lib/generated/prisma";
 
 export interface EnqueueOptions {
   type: string;
@@ -28,6 +29,8 @@ export interface EnqueueOptions {
  * exists with that key, returns the existing job ID (no duplicate).
  */
 export async function enqueue(opts: EnqueueOptions): Promise<string> {
+  const payloadJson = opts.payload as unknown as Prisma.InputJsonValue;
+
   if (opts.idempotencyKey) {
     const existing = await prisma.job.findUnique({
       where: { idempotencyKey: opts.idempotencyKey },
@@ -42,7 +45,7 @@ export async function enqueue(opts: EnqueueOptions): Promise<string> {
     data: {
       type: opts.type,
       queue: opts.queue,
-      payload: opts.payload,
+      payload: payloadJson,
       priority: opts.priority ?? 0,
       maxAttempts: opts.maxAttempts ?? 3,
       scheduledAt: opts.scheduledAt ?? null,
@@ -95,6 +98,10 @@ export async function updateJobProgress(jobId: string, progress: number): Promis
  * Mark a job as completed with optional result data.
  */
 export async function completeJob(jobId: string, result?: Record<string, unknown>): Promise<void> {
+  const resultJson = result
+    ? (result as unknown as Prisma.InputJsonValue)
+    : undefined;
+
   await prisma.job.update({
     where: { id: jobId },
     data: {
@@ -102,7 +109,7 @@ export async function completeJob(jobId: string, result?: Record<string, unknown
       progress: 100,
       completedAt: new Date(),
       error: null,
-      result: result ?? undefined,
+      result: resultJson,
     },
   });
 }

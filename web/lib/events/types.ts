@@ -13,6 +13,9 @@ export interface DomainEvent<T = unknown> {
   occurredAt: Date;
   organizationId: string;
   initiatedByUserId?: number;
+  effectiveUserId?: number;
+  impersonation?: boolean;
+  impersonatedTenantId?: string;
   payload: T;
 }
 

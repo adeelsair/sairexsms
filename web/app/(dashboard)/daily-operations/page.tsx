@@ -29,6 +29,22 @@ export default function DailyOperationsPage() {
       </div>
     );
   }
+  if (!data) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="space-y-2 rounded-xl border border-border bg-surface p-6 text-center">
+          <p className="font-semibold">Dashboard data is unavailable</p>
+          <SxButton
+            sxVariant="primary"
+            onClick={() => window.location.reload()}
+            className="mx-auto"
+          >
+            Retry
+          </SxButton>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">

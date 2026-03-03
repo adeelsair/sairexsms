@@ -276,7 +276,7 @@ export default function AcademicYearsPage() {
         }
         toast.error("Please fix the validation errors");
       } else {
-        toast.error(result.error);
+        toast.error(result.ok ? (result.data.error ?? "Creation failed") : (result.error ?? "Creation failed"));
       }
     }
   };
@@ -327,7 +327,7 @@ export default function AcademicYearsPage() {
       setConfirmAction(null);
       fetchYears();
     } else {
-      toast.error(result.ok ? result.data.error : result.error);
+      toast.error(result.ok ? (result.data.error ?? "Action failed") : (result.error ?? "Action failed"));
     }
     setActionLoading(false);
   };

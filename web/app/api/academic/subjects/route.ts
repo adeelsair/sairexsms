@@ -26,9 +26,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const orgId = isSuperAdmin(guard)
-      ? (searchParams.get("orgId") ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json({ ok: false, error: "Organization context required" }, { status: 400 });
@@ -67,9 +65,7 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
 
-    const orgId = isSuperAdmin(guard)
-      ? ((body.orgId as string) ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json({ ok: false, error: "Organization context required" }, { status: 400 });

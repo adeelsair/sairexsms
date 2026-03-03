@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin, requireAuth, requireRole } from "@/lib/auth-guard";
+import { requireAuth, requireRole } from "@/lib/auth-guard";
+import { resolveAuditActor } from "@/lib/audit/resolve-audit-actor";
 import {
   getOrganizationBillingConfig,
   updateOrganizationBillingConfig,
@@ -7,14 +8,17 @@ import {
 import { billingConfigUpdateSchema } from "@/lib/validations";
 
 export async function GET(request: Request) {
-  const guard = await requireAuth();
+  const guard = await requireAuth(request);
   if (guard instanceof NextResponse) return guard;
+  if (guard.impersonation) {
+    return NextResponse.json(
+      { ok: false, error: "Billing routes are unavailable during impersonation" },
+      { status: 403 },
+    );
+  }
 
   try {
-    const { searchParams } = new URL(request.url);
-    const orgId = isSuperAdmin(guard)
-      ? (searchParams.get("orgId") ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json(
@@ -32,13 +36,20 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const guard = await requireAuth();
+  const guard = await requireAuth(request);
   if (guard instanceof NextResponse) return guard;
+  if (guard.impersonation) {
+    return NextResponse.json(
+      { ok: false, error: "Billing routes are unavailable during impersonation" },
+      { status: 403 },
+    );
+  }
 
   const denied = requireRole(guard, "SUPER_ADMIN");
   if (denied) return denied;
 
   try {
+    const auditActor = resolveAuditActor(guard);
     const body = (await request.json()) as unknown;
     const parsed = billingConfigUpdateSchema.safeParse(body);
     if (!parsed.success) {
@@ -52,9 +63,7 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const orgId = isSuperAdmin(guard)
-      ? (parsed.data.orgId ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json(
@@ -70,6 +79,7 @@ export async function PATCH(request: Request) {
       revenueCalculationMode: parsed.data.revenueCalculationMode,
       changedByUserId: guard.id,
       changedByEmail: guard.email,
+      auditActor,
     });
 
     return NextResponse.json({ ok: true, data });

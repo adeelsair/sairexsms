@@ -131,7 +131,7 @@ export default function MarkAttendancePage() {
     }
 
     toast.success("Attendance saved.");
-    setSuccessResult(result.data?.result);
+    setSuccessResult(result.data?.result ?? null);
     setSaving(false);
   }, [absentees, execute, selectedClass, students.length]);
 

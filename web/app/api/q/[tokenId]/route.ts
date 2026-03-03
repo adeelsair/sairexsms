@@ -40,7 +40,6 @@ export async function GET(
       const data = await resolveFeePaymentQr(tokenId);
       return NextResponse.json({
         type: "FEE_PAYMENT",
-        organizationId: token.organizationId,
         oneTimeUse: token.oneTimeUse,
         ...data.challan,
       });

@@ -4,9 +4,7 @@ import { z } from "zod";
 import { requireAuth, requireRole } from "@/lib/auth-guard";
 import { resetDemoSchool } from "@/lib/demo/demo-generator.service";
 
-const resetSchema = z.object({
-  orgId: z.string().trim().optional(),
-});
+const resetSchema = z.object({});
 
 export async function POST(request: Request) {
   const guard = await requireAuth();
@@ -25,7 +23,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const data = await resetDemoSchool(guard.id, parsed.data.orgId);
+    const data = await resetDemoSchool(guard.id, guard.organizationId ?? undefined);
     return NextResponse.json({ ok: true, data });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to reset demo school";

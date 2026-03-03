@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { TRIAL_POLICY, createTrialWindow } from "@/lib/billing/pricing-architecture";
+import type { AuditActorContext } from "@/lib/audit/resolve-audit-actor";
+import { Prisma } from "@prisma/client";
 
 export interface BillingConfig {
   organizationId: string;
@@ -36,6 +38,7 @@ export async function updateOrganizationBillingConfig(input: {
   closingDay: number;
   changedByUserId: number;
   changedByEmail: string;
+  auditActor?: AuditActorContext;
 }): Promise<BillingConfig> {
   const previous = await getOrganizationBillingConfig(input.organizationId);
   const trial = createTrialWindow();
@@ -66,23 +69,34 @@ export async function updateOrganizationBillingConfig(input: {
     },
   });
 
+  const payloadJson = {
+    oldValue: previous,
+    newValue: {
+      perStudentFee: input.perStudentFee,
+      revenueCalculationMode: input.revenueCalculationMode,
+      closingDay: input.closingDay,
+    },
+    changedBy: input.changedByEmail,
+    changedByUserId: input.changedByUserId,
+    changedAt: new Date().toISOString(),
+    _audit: {
+      actorUserId: input.auditActor?.actorUserId ?? input.changedByUserId,
+      effectiveUserId: input.auditActor?.effectiveUserId ?? input.changedByUserId,
+      tenantId: input.auditActor?.tenantId ?? input.organizationId,
+      impersonation: input.auditActor?.impersonation ?? false,
+      impersonatedTenantId: input.auditActor?.impersonation
+        ? input.auditActor.tenantId
+        : null,
+    },
+  } as unknown as Prisma.InputJsonValue;
+
   await prisma.domainEventLog.create({
     data: {
       organizationId: input.organizationId,
       eventType: "OrganizationBillingConfigUpdated",
-      payload: {
-        oldValue: previous,
-        newValue: {
-          perStudentFee: input.perStudentFee,
-          revenueCalculationMode: input.revenueCalculationMode,
-          closingDay: input.closingDay,
-        },
-        changedBy: input.changedByEmail,
-        changedByUserId: input.changedByUserId,
-        changedAt: new Date().toISOString(),
-      },
+      payload: payloadJson,
       occurredAt: new Date(),
-      initiatedByUserId: input.changedByUserId,
+      initiatedByUserId: input.auditActor?.actorUserId ?? input.changedByUserId,
     },
   });
 

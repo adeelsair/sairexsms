@@ -12,9 +12,8 @@ import {
 } from "@/lib/rbac/assignable-scope";
 
 /**
- * GET /api/regions?orgId=ORG-00001
+ * GET /api/regions
  * Returns the geo hierarchy scoped to the caller's organization.
- * Super admins may pass ?orgId= to view a specific org's hierarchy.
  *
  * GET /api/regions?assignable=true&forRole=SUBREGION_ADMIN
  * Returns only units the current user is allowed to assign for the given role.
@@ -32,15 +31,11 @@ export async function GET(request: Request) {
       return handleAssignable(guard, forRole);
     }
 
-    const queryOrgId = searchParams.get("orgId");
-
-    const orgId = isSuperAdmin(guard)
-      ? (queryOrgId || guard.organizationId || "")
-      : (guard.organizationId || "");
+    const orgId = guard.organizationId || "";
 
     if (!orgId) {
       return NextResponse.json(
-        { error: "organizationId could not be resolved. Pass ?orgId= for super admin." },
+        { error: "organizationId could not be resolved" },
         { status: 400 },
       );
     }

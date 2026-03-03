@@ -13,8 +13,8 @@ export const academicYearSchema = z
       .string()
       .min(3, "Name must be at least 3 characters")
       .max(50, "Name must not exceed 50 characters"),
-    startDate: z.coerce.date({ required_error: "Start date is required" }),
-    endDate: z.coerce.date({ required_error: "End date is required" }),
+    startDate: z.coerce.date({ message: "Start date is required" }),
+    endDate: z.coerce.date({ message: "End date is required" }),
   })
   .refine((data) => data.endDate > data.startDate, {
     message: "End date must be after start date",

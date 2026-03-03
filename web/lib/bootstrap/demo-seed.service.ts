@@ -115,7 +115,11 @@ export async function bootstrapDemoDataIfEmpty(
         },
         select: { id: true, name: true, displayOrder: true },
       });
-      createdClasses.push(cls);
+      createdClasses.push({
+        id: cls.id,
+        name: cls.name,
+        displayOrder: cls.displayOrder ?? index + 1,
+      });
     }
 
     const createdSections: Array<{ id: string; classId: string }> = [];

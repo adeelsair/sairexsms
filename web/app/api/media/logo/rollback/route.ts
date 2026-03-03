@@ -6,7 +6,6 @@ import { resolveOrgId } from "@/lib/tenant";
 
 const schema = z.object({
   version: z.number().int().positive("Version must be a positive integer"),
-  organizationId: z.string().optional(),
 });
 
 /**
@@ -29,7 +28,7 @@ export async function POST(request: Request) {
     }
 
     const { version } = parsed.data;
-    const orgId = resolveOrgId(guard, parsed.data.organizationId);
+    const orgId = resolveOrgId(guard);
 
     const assets = await prisma.mediaAsset.findMany({
       where: { organizationId: orgId, type: "LOGO", version },

@@ -37,8 +37,7 @@ async function processReminderDeliveryJob(data: ReminderDeliveryJobData): Promis
       organizationId: data.organizationId,
     },
     select: {
-      parentPhone: true,
-      parentEmail: true,
+      id: true,
     },
   });
 
@@ -46,8 +45,8 @@ async function processReminderDeliveryJob(data: ReminderDeliveryJobData): Promis
     throw new Error(`Student ${data.studentId} not found for reminder delivery`);
   }
 
-  const toPhone = student.parentPhone;
-  const toEmail = student.parentEmail;
+  const toPhone: string | undefined = undefined;
+  const toEmail: string | undefined = undefined;
 
   if (data.channel === "EMAIL") {
     if (!toEmail) {

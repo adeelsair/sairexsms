@@ -9,6 +9,10 @@ import {
   reconcilePayment,
 } from "@/lib/finance/payment-entry.service";
 import { prisma } from "@/lib/prisma";
+import {
+  incrementDailyChallanCount,
+  incrementDailyStudentCount,
+} from "@/lib/performance/organization-daily-stats.service";
 
 const collectFeePayloadSchema = z.object({
   studentId: z.coerce.number().int().positive(),
@@ -27,12 +31,10 @@ const mobileActionSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("COLLECT_FEE"),
     payload: collectFeePayloadSchema,
-    orgId: z.string().optional(),
   }),
   z.object({
     type: z.literal("MARK_ATTENDANCE"),
     payload: markAttendancePayloadSchema,
-    orgId: z.string().optional(),
   }),
   z.object({
     type: z.literal("ADD_STUDENT_QUICK"),
@@ -42,7 +44,6 @@ const mobileActionSchema = z.discriminatedUnion("type", [
       mobileNumber: z.string().min(7),
       classId: z.string().min(1),
     }),
-    orgId: z.string().optional(),
   }),
   z.object({
     type: z.literal("ISSUE_CHALLAN"),
@@ -53,7 +54,6 @@ const mobileActionSchema = z.discriminatedUnion("type", [
       month: z.coerce.number().int().min(1).max(12),
       year: z.coerce.number().int().min(2000).max(2100).optional(),
     }),
-    orgId: z.string().optional(),
   }),
 ]);
 
@@ -122,6 +122,75 @@ function buildDueDate(month: number, year: number): Date {
   return new Date(Date.UTC(year, month - 1, 10));
 }
 
+async function createMobileChallanWithPosting(input: {
+  organizationId: string;
+  campusId: number;
+  studentId: number;
+  challanNo: string;
+  dueDate: Date;
+  totalAmount: number;
+  generatedBy: string;
+  month: number;
+  year: number;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const challan = await tx.feeChallan.create({
+      data: {
+        organizationId: input.organizationId,
+        campusId: input.campusId,
+        studentId: input.studentId,
+        challanNo: input.challanNo,
+        dueDate: input.dueDate,
+        totalAmount: input.totalAmount,
+        generatedBy: input.generatedBy,
+        month: input.month,
+        year: input.year,
+      },
+      select: {
+        id: true,
+        student: { select: { fullName: true } },
+        totalAmount: true,
+      },
+    });
+
+    await tx.ledgerEntry.create({
+      data: {
+        organizationId: input.organizationId,
+        studentId: input.studentId,
+        campusId: input.campusId,
+        challanId: challan.id,
+        entryType: "CHALLAN_CREATED",
+        direction: "DEBIT",
+        amount: input.totalAmount,
+        referenceId: String(challan.id),
+        referenceType: "FeeChallan",
+      },
+    });
+
+    await tx.studentFinancialSummary.upsert({
+      where: { studentId: input.studentId },
+      create: {
+        studentId: input.studentId,
+        organizationId: input.organizationId,
+        campusId: input.campusId,
+        totalDebit: input.totalAmount,
+        totalCredit: 0,
+        balance: input.totalAmount,
+      },
+      update: {
+        totalDebit: { increment: input.totalAmount },
+        balance: { increment: input.totalAmount },
+      },
+    });
+    await incrementDailyChallanCount(tx, {
+      organizationId: input.organizationId,
+      outstandingAmount: input.totalAmount,
+    });
+
+    return challan;
+  });
+}
+
 async function computeMonthlyFeeForStudent(input: {
   organizationId: string;
   campusId: number;
@@ -176,10 +245,7 @@ export async function POST(request: Request) {
     }
 
     const action = parsed.data;
-    const organizationId =
-      isSuperAdmin(guard) && action.orgId
-        ? action.orgId
-        : guard.organizationId;
+    const organizationId = guard.organizationId;
 
     if (!organizationId) {
       return NextResponse.json(
@@ -376,6 +442,7 @@ export async function POST(request: Request) {
             admissionNo: true,
           },
         });
+        await incrementDailyStudentCount(tx, { organizationId });
 
         await tx.studentEnrollment.create({
           data: {
@@ -503,23 +570,16 @@ export async function POST(request: Request) {
           );
         }
 
-        const challan = await prisma.feeChallan.create({
-          data: {
-            organizationId,
-            campusId: student.campusId,
-            studentId: student.id,
-            challanNo: buildMobileChallanNo(student.campusId, student.id, month, year),
-            dueDate,
-            totalAmount: monthlyFee,
-            generatedBy: `MobileAction:${guard.id}`,
-            month,
-            year,
-          },
-          select: {
-            id: true,
-            student: { select: { fullName: true } },
-            totalAmount: true,
-          },
+        const challan = await createMobileChallanWithPosting({
+          organizationId,
+          campusId: student.campusId,
+          studentId: student.id,
+          challanNo: buildMobileChallanNo(student.campusId, student.id, month, year),
+          dueDate,
+          totalAmount: monthlyFee,
+          generatedBy: `MobileAction:${guard.id}`,
+          month,
+          year,
         });
 
         return NextResponse.json({
@@ -623,24 +683,21 @@ export async function POST(request: Request) {
           continue;
         }
 
-        const challan = await prisma.feeChallan.create({
-          data: {
-            organizationId,
-            campusId: cls.campusId,
-            studentId: enrollment.studentId,
-            challanNo: buildMobileChallanNo(
-              cls.campusId,
-              enrollment.studentId,
-              month,
-              year,
-            ),
-            dueDate,
-            totalAmount: monthlyFee,
-            generatedBy: `MobileAction:${guard.id}`,
+        const challan = await createMobileChallanWithPosting({
+          organizationId,
+          campusId: cls.campusId,
+          studentId: enrollment.studentId,
+          challanNo: buildMobileChallanNo(
+            cls.campusId,
+            enrollment.studentId,
             month,
             year,
-          },
-          select: { id: true },
+          ),
+          dueDate,
+          totalAmount: monthlyFee,
+          generatedBy: `MobileAction:${guard.id}`,
+          month,
+          year,
         });
 
         generated += 1;

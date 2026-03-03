@@ -15,7 +15,7 @@ function buildUrl(key: string): string {
 
 /**
  * POST /api/media/logo/upload
- * Accepts multipart FormData with: file, organizationId? (optional).
+ * Accepts multipart FormData with: file.
  * Validates, generates WEBP variants, uploads to S3, records MediaAsset rows.
  */
 export async function POST(request: Request) {
@@ -25,13 +25,12 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
-    const orgIdParam = formData.get("organizationId") as string | null;
 
     if (!file || !(file instanceof File)) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    const orgId = resolveOrgId(guard, orgIdParam ?? undefined);
+    const orgId = resolveOrgId(guard);
     const buffer = Buffer.from(await file.arrayBuffer());
 
     const meta = await validateImage(buffer, file.size);

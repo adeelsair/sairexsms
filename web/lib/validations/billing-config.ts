@@ -18,7 +18,6 @@ export const billingConfigSchema = z.object({
 export type BillingConfigInput = z.infer<typeof billingConfigSchema>;
 
 export const billingConfigUpdateSchema = z.object({
-  orgId: z.string().trim().min(1).optional(),
   perStudentFee: z.coerce.number().min(0, "Per student fee must be zero or greater"),
   revenueCalculationMode: z.enum(["ON_GENERATED_FEE", "ON_COLLECTED_FEE"]),
   closingDay: z.coerce

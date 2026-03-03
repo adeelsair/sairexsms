@@ -73,6 +73,8 @@ export interface CompletedOrg {
     id: number;
     role: string;
     organizationId: string;
+    organizationStructure?: string | null;
+    campusId?: number | null;
   };
 }
 

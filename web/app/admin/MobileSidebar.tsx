@@ -31,6 +31,7 @@ export function MobileSidebar({
   tenantName,
 }: MobileSidebarProps) {
   const [open, setOpen] = useState(false);
+  const shouldRoundSairexLogo = tenantLogoUrl.startsWith("/sairex-logo");
 
   return (
     <>
@@ -58,7 +59,7 @@ export function MobileSidebar({
                 alt="Tenant logo"
                 width={320}
                 height={88}
-                className="h-auto w-full object-contain"
+                className={`h-auto w-full object-contain ${shouldRoundSairexLogo ? "rounded-md" : ""}`}
                 priority
               />
             </div>

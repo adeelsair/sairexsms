@@ -120,7 +120,7 @@ export async function getOrganizationFinanceDetail(
     ? buildSummaryFromCycle(organization.organizationName, organization.plan?.planType, latestClosedCycle)
     : {
         organizationName: organization.organizationName,
-        planType: organization.plan?.planType ?? "UNASSIGNED",
+        planType: (organization.plan?.planType ?? "UNASSIGNED") as OrganizationFinanceDetail["summary"]["planType"],
         revenueMode: null,
         perStudentFee: null,
         closingDay: null,
@@ -170,7 +170,7 @@ export async function getOrganizationFinanceDetail(
 
 function buildSummaryFromCycle(
   organizationName: string,
-  planType: PlanType | undefined,
+  planType: PlanType | string | null | undefined,
   cycle: {
     revenueCalculationModeUsed: RevenueCalculationMode;
     perStudentFeeUsed: unknown;
@@ -189,7 +189,7 @@ function buildSummaryFromCycle(
 
   return {
     organizationName,
-    planType: planType ?? "UNASSIGNED",
+    planType: (planType ?? "UNASSIGNED") as OrganizationFinanceDetail["summary"]["planType"],
     revenueMode: cycle.revenueCalculationModeUsed,
     perStudentFee: Number(cycle.perStudentFeeUsed),
     closingDay: cycle.closingDayUsed,

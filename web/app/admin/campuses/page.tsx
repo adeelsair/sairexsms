@@ -42,11 +42,6 @@ import {
 
 /* ── Types ─────────────────────────────────────────────────── */
 
-interface Organization {
-  id: string;
-  organizationName: string;
-}
-
 interface GeoCity {
   id: string;
   name: string;
@@ -77,7 +72,6 @@ interface Campus {
 
 const campusSchema = z.object({
   name: z.string().min(1, "Campus name is required"),
-  organizationId: z.string().min(1, "Organization is required"),
   cityId: z.string().min(1, "City is required"),
   zoneId: z.string().optional(),
 });
@@ -144,7 +138,6 @@ const columns: SxColumn<Campus>[] = [
 
 export default function CampusesPage() {
   const [campuses, setCampuses] = useState<Campus[]>([]);
-  const [orgs, setOrgs] = useState<Organization[]>([]);
   const [cities, setCities] = useState<GeoCity[]>([]);
   const [zones, setZones] = useState<GeoZone[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,14 +145,12 @@ export default function CampusesPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [camResult, orgResult, geoResult] = await Promise.all([
+    const [camResult, geoResult] = await Promise.all([
       api.get<Campus[]>("/api/campuses"),
-      api.get<Organization[]>("/api/organizations"),
       api.get<{ cities: GeoCity[]; zones: GeoZone[] }>("/api/regions"),
     ]);
     if (camResult.ok) setCampuses(camResult.data);
     else toast.error(camResult.error);
-    if (orgResult.ok) setOrgs(orgResult.data);
     if (geoResult.ok) {
       setCities(geoResult.data.cities);
       setZones(geoResult.data.zones);
@@ -171,7 +162,7 @@ export default function CampusesPage() {
 
   const form = useForm<CampusFormValues>({
     resolver: zodResolver(campusSchema),
-    defaultValues: { name: "", organizationId: "", cityId: "", zoneId: "" },
+    defaultValues: { name: "", cityId: "", zoneId: "" },
   });
 
   const { handleSubmit, reset, watch, formState: { isSubmitting } } = form;
@@ -221,7 +212,7 @@ export default function CampusesPage() {
 
       <SxDataTable
         className="rounded-xl border-border bg-surface"
-        columns={columns}
+        columns={columns as unknown as SxColumn<Record<string, unknown>>[]}
         data={campuses as unknown as Record<string, unknown>[]}
         loading={loading}
         emptyMessage="No campuses found. Register one to get started."
@@ -236,23 +227,6 @@ export default function CampusesPage() {
 
           <Form {...form}>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <FormField control={form.control} name="organizationId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Parent Organization</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl>
-                      <SelectTrigger className="w-full"><SelectValue placeholder="Select organization" /></SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {orgs.map((org) => (
-                        <SelectItem key={org.id} value={org.id}>{org.organizationName}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-
               <FormField control={form.control} name="name" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Campus Name</FormLabel>

@@ -1,4 +1,5 @@
 import { Queue } from "bullmq";
+import type { ConnectionOptions } from "bullmq";
 import { getRedisConnection } from "./connection";
 
 const queues = new Map<string, Queue>();
@@ -23,7 +24,7 @@ export function getQueue(name: string): Queue {
   const overrides = QUEUE_DEFAULTS[name];
 
   const queue = new Queue(name, {
-    connection: getRedisConnection(),
+    connection: getRedisConnection() as unknown as ConnectionOptions,
     defaultJobOptions: {
       attempts: overrides?.attempts ?? 3,
       backoff: overrides?.backoff ?? { type: "exponential", delay: 2000 },

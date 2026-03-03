@@ -6,6 +6,7 @@
  * Async handlers are pushed to BullMQ queues.
  */
 import { createId } from "@paralleldrive/cuid2";
+import type { AuditActorContext } from "@/lib/audit/resolve-audit-actor";
 import type {
   DomainEvent,
   EventPayloadMap,
@@ -56,14 +57,26 @@ export function createEvent<K extends keyof EventPayloadMap>(
   eventType: K,
   organizationId: string,
   payload: EventPayloadMap[K],
-  initiatedByUserId?: number,
+  audit?: number | AuditActorContext,
 ): DomainEvent<EventPayloadMap[K]> {
+  const auditContext = typeof audit === "number"
+    ? {
+        actorUserId: audit,
+        effectiveUserId: audit,
+        tenantId: organizationId,
+        impersonation: false,
+      }
+    : audit;
+
   return {
     eventId: createId(),
     eventType,
     occurredAt: new Date(),
     organizationId,
-    initiatedByUserId,
+    initiatedByUserId: auditContext?.actorUserId,
+    effectiveUserId: auditContext?.effectiveUserId,
+    impersonation: auditContext?.impersonation ?? false,
+    impersonatedTenantId: auditContext?.impersonation ? auditContext.tenantId : undefined,
     payload,
   };
 }
@@ -139,9 +152,9 @@ export async function emit<K extends keyof EventPayloadMap>(
   eventType: K,
   organizationId: string,
   payload: EventPayloadMap[K],
-  initiatedByUserId?: number,
+  audit?: number | AuditActorContext,
 ): Promise<DispatchResult> {
-  const event = createEvent(eventType, organizationId, payload, initiatedByUserId);
+  const event = createEvent(eventType, organizationId, payload, audit);
   return dispatchEvent(event);
 }
 
@@ -149,13 +162,27 @@ export async function emit<K extends keyof EventPayloadMap>(
 
 async function persistEvent(event: DomainEvent): Promise<void> {
   const { prisma } = await import("@/lib/prisma");
+  const payloadObject =
+    typeof event.payload === "object" && event.payload !== null
+      ? (event.payload as Record<string, unknown>)
+      : { value: event.payload };
+  const payloadWithAudit = {
+    ...payloadObject,
+    _audit: {
+      actorUserId: event.initiatedByUserId ?? null,
+      effectiveUserId: event.effectiveUserId ?? null,
+      tenantId: event.organizationId,
+      impersonation: Boolean(event.impersonation),
+      impersonatedTenantId: event.impersonatedTenantId ?? null,
+    },
+  };
 
   await prisma.domainEventLog.create({
     data: {
       id: event.eventId,
       organizationId: event.organizationId,
       eventType: event.eventType,
-      payload: event.payload as Record<string, unknown>,
+      payload: payloadWithAudit,
       occurredAt: event.occurredAt,
       initiatedByUserId: event.initiatedByUserId ?? null,
     },
@@ -181,6 +208,9 @@ async function enqueueAsyncHandler(
       handlerName: reg.handlerName,
       organizationId: event.organizationId,
       initiatedByUserId: event.initiatedByUserId,
+      effectiveUserId: event.effectiveUserId,
+      impersonation: event.impersonation,
+      impersonatedTenantId: event.impersonatedTenantId,
       occurredAt: event.occurredAt.toISOString(),
       eventPayload: event.payload,
     },

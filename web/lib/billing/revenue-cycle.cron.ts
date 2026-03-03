@@ -189,7 +189,16 @@ async function emitDomainEvent(
     data: {
       organizationId,
       eventType,
-      payload,
+      payload: {
+        ...payload,
+        _audit: {
+          actorUserId: null,
+          effectiveUserId: null,
+          tenantId: organizationId,
+          impersonation: false,
+          impersonatedTenantId: null,
+        },
+      },
       occurredAt: new Date(),
     },
   });

@@ -219,13 +219,13 @@ export default function JobMonitorPage() {
         <div className="flex items-center gap-2">
           <SxButton
             size="sm"
-            variant={autoRefresh ? "default" : "outline"}
+            sxVariant={autoRefresh ? "primary" : "outline"}
             onClick={() => setAutoRefresh(!autoRefresh)}
           >
             {autoRefresh ? <Loader2 size={14} className="animate-spin mr-1" /> : <Clock size={14} className="mr-1" />}
             {autoRefresh ? "Live" : "Auto"}
           </SxButton>
-          <SxButton size="sm" variant="outline" onClick={fetchJobs} disabled={loading}>
+          <SxButton size="sm" sxVariant="outline" onClick={fetchJobs} disabled={loading}>
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
           </SxButton>
         </div>
@@ -297,10 +297,10 @@ export default function JobMonitorPage() {
             Showing {(page - 1) * 50 + 1}–{Math.min(page * 50, data.pagination.total)} of {data.pagination.total}
           </p>
           <div className="flex gap-1">
-            <SxButton size="sm" variant="outline" onClick={() => setPage(page - 1)} disabled={page <= 1}>
+            <SxButton size="sm" sxVariant="outline" onClick={() => setPage(page - 1)} disabled={page <= 1}>
               <ChevronLeft size={14} />
             </SxButton>
-            <SxButton size="sm" variant="outline" onClick={() => setPage(page + 1)} disabled={page >= data.pagination.totalPages}>
+            <SxButton size="sm" sxVariant="outline" onClick={() => setPage(page + 1)} disabled={page >= data.pagination.totalPages}>
               <ChevronRight size={14} />
             </SxButton>
           </div>

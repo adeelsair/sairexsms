@@ -160,7 +160,7 @@ export function OrgRevenueDrawer({ organizationId, open, onClose }: OrgRevenueDr
     setLoading(true);
 
     const result = await api.get<ApiEnvelope<OrgFinanceDetail>>(
-      `/api/finance/dashboard/org/${organizationId}`,
+      "/api/finance/dashboard/org",
     );
 
     if (!result.ok) {

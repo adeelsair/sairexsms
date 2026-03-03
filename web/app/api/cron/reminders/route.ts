@@ -17,9 +17,7 @@ export async function GET(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const orgId = isSuperAdmin(guard)
-      ? (searchParams.get("orgId") ?? guard.organizationId)
-      : guard.organizationId;
+    const orgId = guard.organizationId;
 
     if (!orgId) {
       return NextResponse.json({ error: "Organization context required" }, { status: 400 });
@@ -30,7 +28,7 @@ export async function GET(request: Request) {
       type: "REMINDER_RUN",
       queue: REMINDER_QUEUE,
       organizationId: orgId,
-      userId: guard.userId,
+      userId: guard.id,
       payload: { organizationId: orgId },
       maxAttempts: 5,
       idempotencyKey: `cron-reminder-run:${orgId}:${dateKey}`,

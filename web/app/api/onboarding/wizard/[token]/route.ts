@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { applyRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 type RouteContext = {
-  params: { token: string };
+  params: Promise<{ token: string }>;
 };
 
 export async function GET(request: Request, context: RouteContext) {
@@ -12,7 +12,7 @@ export async function GET(request: Request, context: RouteContext) {
   if (blocked) return blocked;
 
   try {
-    const token = context.params.token;
+    const { token } = await context.params;
     const draft = await prisma.onboardingDraft.findUnique({
       where: { token },
       select: {

@@ -7,7 +7,7 @@ import { resolveOrgId } from "@/lib/tenant";
 const schema = z.object({
   reportType: z.enum(["FEE_COLLECTION", "FEE_DEFAULTERS", "STUDENT_LIST"]),
   campusId: z.number().int().positive().optional(),
-  filters: z.record(z.unknown()).optional(),
+  filters: z.record(z.string(), z.unknown()).optional(),
 });
 
 /**

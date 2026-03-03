@@ -71,7 +71,7 @@ export async function POST(request: Request) {
         financial: financial ?? false,
         academic: academic ?? false,
         reason,
-        userId: guard.userId,
+        userId: guard.id,
       });
       return NextResponse.json(result);
     }

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
 import { toast } from "sonner";
 
 import { SxButton } from "@/components/sx";
@@ -131,18 +130,7 @@ export default function JoinPage() {
       return;
     }
 
-    const signInResult = await signIn("phone-otp", {
-      userId: String(claim.data.userId),
-      redirect: false,
-    });
-
     setIsBusy(false);
-
-    if (signInResult?.error) {
-      toast.error("Joined successfully. Please login manually.");
-      router.push("/login");
-      return;
-    }
 
     toast.success("Joined successfully");
     router.push("/mobile/dashboard");

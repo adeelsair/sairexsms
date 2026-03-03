@@ -249,6 +249,9 @@ async function applyDedupAndEscalation(
 }
 
 function groupActions(actions: MobileAction[]): GroupedTodayActions {
+  const completedToday = actions.filter((action) => action.id.startsWith("completed_"));
+  const generatedToday = actions.filter((action) => !action.id.startsWith("completed_"));
+
   return {
     urgent: actions.filter((action) => action.priority === "URGENT"),
     attention: actions.filter((action) => action.priority === "HIGH"),
@@ -257,7 +260,11 @@ function groupActions(actions: MobileAction[]): GroupedTodayActions {
         (action.priority === "MEDIUM" || action.priority === "LOW") &&
         !action.id.startsWith("completed_"),
     ),
-    completedToday: actions.filter((action) => action.id.startsWith("completed_")),
+    completedToday,
+    meta: {
+      completedToday: completedToday.length,
+      totalGeneratedToday: generatedToday.length,
+    },
   };
 }
 

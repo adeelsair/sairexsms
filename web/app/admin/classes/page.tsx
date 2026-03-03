@@ -538,7 +538,20 @@ export default function ClassesPage() {
                         <Input
                           type="number"
                           placeholder="e.g. 1"
-                          {...field}
+                          value={
+                            typeof field.value === "number"
+                              ? field.value
+                              : field.value === null || field.value === undefined
+                                ? ""
+                                : String(field.value)
+                          }
+                          onChange={(event) => {
+                            const raw = event.target.value;
+                            field.onChange(raw === "" ? undefined : Number(raw));
+                          }}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
                         />
                       </FormControl>
                       <FormMessage />
@@ -614,7 +627,20 @@ export default function ClassesPage() {
                         <Input
                           type="number"
                           placeholder="e.g. 40"
-                          {...field}
+                          value={
+                            typeof field.value === "number"
+                              ? field.value
+                              : field.value === null || field.value === undefined
+                                ? ""
+                                : String(field.value)
+                          }
+                          onChange={(event) => {
+                            const raw = event.target.value;
+                            field.onChange(raw === "" ? undefined : Number(raw));
+                          }}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
                         />
                       </FormControl>
                       <FormMessage />
