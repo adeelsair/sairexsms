@@ -5,10 +5,19 @@ import { useRouter } from "next/navigation";
 import { SxButton } from "./sx-button";
 import { SxLimitMeter } from "./sx-limit-meter";
 import { usePlanUsage } from "@/lib/billing/use-plan-limit";
+import type { PlanUsagePayload } from "@/lib/billing/plan-usage.service";
 
-export function PlanUsageCard() {
+interface PlanUsageCardProps {
+  initialUsage?: PlanUsagePayload | null;
+}
+
+export function PlanUsageCard({ initialUsage = null }: PlanUsageCardProps) {
   const router = useRouter();
-  const { usage, loading } = usePlanUsage();
+  const { usage: liveUsage, loading } = usePlanUsage({
+    enabled: !initialUsage,
+    initialUsage,
+  });
+  const usage = initialUsage ?? liveUsage;
 
   if (loading || !usage) {
     return (

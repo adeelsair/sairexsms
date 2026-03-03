@@ -13,11 +13,18 @@ interface PlanUsageEnvelope {
 
 type PlanLimitKey = "students" | "campuses" | "staff";
 
-export function usePlanUsage() {
-  const [usage, setUsage] = useState<PlanUsagePayload | null>(null);
-  const [loading, setLoading] = useState(true);
+interface UsePlanUsageOptions {
+  enabled?: boolean;
+  initialUsage?: PlanUsagePayload | null;
+}
+
+export function usePlanUsage(options?: UsePlanUsageOptions) {
+  const enabled = options?.enabled ?? true;
+  const [usage, setUsage] = useState<PlanUsagePayload | null>(options?.initialUsage ?? null);
+  const [loading, setLoading] = useState(enabled && !options?.initialUsage);
 
   const refresh = useCallback(async () => {
+    if (!enabled) return;
     const result = await api.get<PlanUsageEnvelope>("/api/billing/plan-usage");
     if (!result.ok) {
       toast.error(result.error);
@@ -31,18 +38,20 @@ export function usePlanUsage() {
     }
     setUsage(result.data.data);
     setLoading(false);
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
+    if (!enabled) return;
     refresh();
-  }, [refresh]);
+  }, [enabled, refresh]);
 
   useEffect(() => {
+    if (!enabled) return;
     const interval = setInterval(() => {
       refresh();
     }, 15000);
     return () => clearInterval(interval);
-  }, [refresh]);
+  }, [enabled, refresh]);
 
   return { usage, loading, refresh };
 }
