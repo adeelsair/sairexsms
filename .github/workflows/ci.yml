@@ -23,6 +23,7 @@ jobs:
       NEXT_TELEMETRY_DISABLED: "1"
       # Set this repository variable to "true" when CI should run DB-backed finance checks.
       RUN_FINANCE_TESTS: ${{ vars.RUN_FINANCE_TESTS || 'false' }}
+      DATABASE_URL_TEST: ${{ secrets.DATABASE_URL_TEST }}
 
     steps:
       - name: Checkout
@@ -48,16 +49,16 @@ jobs:
         run: npm test
 
       - name: Prepare finance test env
-        if: env.RUN_FINANCE_TESTS == 'true' && secrets.DATABASE_URL_TEST != ''
+        if: env.RUN_FINANCE_TESTS == 'true' && env.DATABASE_URL_TEST != ''
         run: |
           cat <<'EOF' > .env.test
           DATABASE_URL=${{ secrets.DATABASE_URL_TEST }}
           EOF
 
       - name: Finance migration smoke
-        if: env.RUN_FINANCE_TESTS == 'true' && secrets.DATABASE_URL_TEST != ''
+        if: env.RUN_FINANCE_TESTS == 'true' && env.DATABASE_URL_TEST != ''
         run: npm run test:finance:migrate
 
       - name: Finance reconciliation test
-        if: env.RUN_FINANCE_TESTS == 'true' && secrets.DATABASE_URL_TEST != ''
+        if: env.RUN_FINANCE_TESTS == 'true' && env.DATABASE_URL_TEST != ''
         run: npm run test:finance
