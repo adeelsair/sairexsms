@@ -1,0 +1,2070 @@
+// SAIREX SMS — Enterprise SaaS Onboarding + Multi-Tenant RBAC Schema
+
+generator client {
+  provider                    = "prisma-client-py"
+  enable_experimental_decimal = true
+}
+
+generator jsClient {
+  provider      = "prisma-client-js"
+  output        = "../web/lib/generated/prisma"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+////////////////////////////////////////////////////////////
+/// ENUMS
+////////////////////////////////////////////////////////////
+
+enum PlatformRole {
+  SUPER_ADMIN
+  SUPPORT
+}
+
+enum MembershipRole {
+  ORG_ADMIN
+
+  REGION_ADMIN
+  SUBREGION_ADMIN
+  ZONE_ADMIN
+  CAMPUS_ADMIN
+
+  TEACHER
+  ACCOUNTANT
+  PARENT
+  STAFF
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+}
+
+enum OrganizationCategory {
+  SCHOOL
+  COLLEGE
+  ACADEMY
+  INSTITUTE
+  UNIVERSITY
+  OTHERS
+}
+
+enum OrganizationStructure {
+  SINGLE
+  MULTIPLE
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum OnboardingStep {
+  ORG_IDENTITY
+  LEGAL
+  CONTACT_ADDRESS
+  BRANDING
+  COMPLETED
+}
+
+enum AddressType {
+  HEAD_OFFICE
+  BILLING
+  CAMPUS
+  OTHER
+}
+
+enum UnitScopeType {
+  REGION
+  SUBREGION
+  CITY
+  ZONE
+  CAMPUS
+}
+
+enum UnitStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum MediaType {
+  LOGO
+  FAVICON
+  DOCUMENT
+}
+
+enum MediaVariant {
+  ORIGINAL
+  SM
+  MD
+  LG
+  DARK
+  PRINT
+}
+
+enum AuditAction {
+  MEMBERSHIP_INVITED
+  MEMBERSHIP_ROLE_CHANGED
+  MEMBERSHIP_SCOPE_CHANGED
+  MEMBERSHIP_REVOKED
+  MEMBERSHIP_REACTIVATED
+  PAYMENT_RECONCILED
+  PAYMENT_REVERSED
+  PAYMENT_FAILED
+  FEE_POSTING_STARTED
+  FEE_POSTING_COMPLETED
+  FEE_POSTING_FAILED
+  STUDENT_ENROLLED
+  STUDENT_PROMOTED
+  STUDENT_TRANSFERRED
+  STUDENT_WITHDRAWN
+  STUDENT_RETAINED
+  STUDENT_GRADUATED
+  ACADEMIC_YEAR_CLOSED
+  ACADEMIC_YEAR_ACTIVATED
+  PROMOTION_RUN_COMPLETED
+  PROMOTION_RUN_FAILED
+}
+
+enum FinanceRoutingMode {
+  CAMPUS_PRIMARY
+  NEAREST_PARENT_PRIMARY
+}
+
+enum PaymentChannel {
+  OTC
+  BANK_TRANSFER
+  ONLINE_GATEWAY
+  MOBILE_WALLET
+  ONEBILL
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  RECONCILED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentGateway {
+  EASYPAISA
+  JAZZCASH
+  ONEBILL
+  KUICKPAY
+  STRIPE
+  MANUAL
+}
+
+enum ChallanStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
+enum LedgerEntryType {
+  CHALLAN_CREATED
+  PAYMENT_RECEIVED
+  ADJUSTMENT
+  REFUND
+  WAIVER
+}
+
+enum LedgerDirection {
+  DEBIT
+  CREDIT
+}
+
+enum FeeFrequency {
+  MONTHLY
+  TERM
+  ANNUAL
+}
+
+enum PostingRunStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ReminderChannel {
+  SMS
+  WHATSAPP
+  EMAIL
+}
+
+enum ReminderStatus {
+  SENT
+  FAILED
+  DELIVERED
+  READ
+}
+
+enum ReminderTriggerType {
+  BEFORE_DUE
+  AFTER_DUE
+  PARTIAL_PAYMENT
+  FINAL_NOTICE
+  RECEIPT
+}
+
+enum AcademicYearStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  PROMOTED
+  RETAINED
+  TRANSFERRED
+  WITHDRAWN
+  GRADUATED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  LEAVE
+  HALF_DAY
+}
+
+enum ExamType {
+  UNIT_TEST
+  MID_TERM
+  FINAL
+  TERM
+  ANNUAL
+}
+
+enum ExamStatus {
+  DRAFT
+  ACTIVE
+  LOCKED
+  PUBLISHED
+}
+
+enum PromotionRunStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+////////////////////////////////////////////////////////////
+/// USER (GLOBAL IDENTITY)
+////////////////////////////////////////////////////////////
+
+model User {
+  id       Int     @id @default(autoincrement())
+  email    String? @unique
+  password String?
+  name     String?
+  isActive Boolean @default(false)
+
+  phone           String? @unique
+  isPhoneVerified Boolean @default(false)
+
+  emailVerifiedAt    DateTime?
+  emailVerifyToken   String?   @unique
+  emailVerifyExpires DateTime?
+
+  platformRole PlatformRole?
+
+  tokenVersion Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships       Membership[]
+  createdOrgs       Organization[]       @relation("OrgCreator")
+  sentInvitations   Invitation[]
+  resetTokens       PasswordResetToken[]
+  verificationCodes VerificationCode[]
+  jobs              Job[]
+  sessions          Session[]
+
+  auditActionsPerformed RbacAuditLog[] @relation("AuditActor")
+  auditActionsReceived  RbacAuditLog[] @relation("AuditTarget")
+  postingRuns           PostingRun[]
+  promotionRuns         PromotionRun[]
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       Int
+  expires      DateTime
+
+  organizationId        String?  @db.VarChar(11)
+  campusId              Int?
+  membershipId          Int?
+  organizationStructure String?
+  unitPath              String?
+  role                  String?
+  platformRole          String?
+
+  impersonation             Boolean   @default(false)
+  impersonationOriginalUserId Int?
+  impersonationEffectiveUserId Int?
+  impersonationTenantId       String? @db.VarChar(11)
+  impersonationExpiresAt      DateTime?
+
+  originalOrganizationId        String? @db.VarChar(11)
+  originalCampusId              Int?
+  originalMembershipId          Int?
+  originalOrganizationStructure String?
+  originalUnitPath              String?
+  originalRole                  String?
+  originalPlatformRole          String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([expires])
+}
+
+////////////////////////////////////////////////////////////
+/// ONBOARDING VERIFICATION CODES
+////////////////////////////////////////////////////////////
+
+model VerificationCode {
+  id          String    @id @default(cuid())
+  userId      Int
+  channel     String // "email" | "mobile" | "whatsapp"
+  target      String // email address or phone number
+  codeHash    String // SHA-256 hex digest of the 6-digit OTP
+  expiresAt   DateTime
+  verified    Boolean   @default(false)
+  verifiedAt  DateTime?
+  attempts    Int       @default(0)
+  lockedUntil DateTime?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, channel, target])
+}
+
+////////////////////////////////////////////////////////////
+/// OTP SESSION (Passwordless Phone Auth)
+////////////////////////////////////////////////////////////
+
+model OtpSession {
+  id        String   @id @default(cuid())
+  phone     String
+  codeHash  String
+  expiresAt DateTime
+  consumed  Boolean  @default(false)
+  attempts  Int      @default(0)
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+  @@index([expiresAt])
+  @@index([ipAddress])
+}
+
+////////////////////////////////////////////////////////////
+/// QR TOKEN INFRASTRUCTURE
+////////////////////////////////////////////////////////////
+
+model QrToken {
+  id              String      @id @default(cuid())
+  organizationId  String      @db.VarChar(11)
+  type            QrTokenType
+  referenceId     String
+  label           String?
+  oneTimeUse      Boolean     @default(false)
+  metadata        Json?
+  expiresAt       DateTime?
+  consumed        Boolean     @default(false)
+  consumedAt      DateTime?
+  createdByUserId Int?
+  createdAt       DateTime    @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, type])
+  @@index([type, referenceId])
+  @@index([referenceId])
+}
+
+model QRInviteToken {
+  id             String   @id @default(uuid())
+  organizationId String   @db.VarChar(11)
+  role           String
+  expiresAt      DateTime
+  maxUses        Int?
+  usedCount      Int      @default(0)
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([organizationId, role])
+  @@index([expiresAt])
+}
+
+enum QrTokenType {
+  FEE_PAYMENT
+  PARENT_ACCESS
+  ADMISSION
+  ATTENDANCE
+  LOGIN
+}
+
+////////////////////////////////////////////////////////////
+/// ONBOARDING PROGRESS (Guided Setup Wizard)
+////////////////////////////////////////////////////////////
+
+model OnboardingProgress {
+  organizationId String   @id @db.VarChar(11)
+  currentStep    Int      @default(1)
+  stepsCompleted Json     @default("[]")
+  completed      Boolean  @default(false)
+  metadata       Json?
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+////////////////////////////////////////////////////////////
+/// DASHBOARD ACTION REGISTRY (Adoption Layer)
+////////////////////////////////////////////////////////////
+
+model DashboardAction {
+  id             String   @id @default(cuid())
+  organizationId String?  @db.VarChar(11)
+  role           String
+  actionKey      String
+  label          String
+  icon           String
+  route          String
+  category       String   @default("primary")
+  enabled        Boolean  @default(true)
+  displayOrder   Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, role, actionKey])
+  @@index([organizationId, role, enabled])
+}
+
+////////////////////////////////////////////////////////////
+/// PRICING & FEATURE GATING
+////////////////////////////////////////////////////////////
+
+enum PlanType {
+  FREE
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+enum RevenueCycleStatus {
+  OPEN
+  CLOSED
+}
+
+enum RevenueCalculationMode {
+  ON_GENERATED_FEE
+  ON_COLLECTED_FEE
+}
+
+model OrganizationPlan {
+  id             String   @id @default(cuid())
+  organizationId String   @unique @db.VarChar(11)
+  planType       PlanType @default(FREE)
+  active         Boolean  @default(true)
+  trialPlanType  PlanType? @default(PRO)
+  trialStartedAt DateTime?
+  trialEndsAt    DateTime?
+  maxStudents    Int?
+  maxCampuses    Int?
+  revenueCalculationMode RevenueCalculationMode @default(ON_GENERATED_FEE)
+  perStudentFee          Decimal                @default(0) @db.Decimal(12, 2)
+  closingDay             Int                    @default(10)
+  expiresAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model PlanFeature {
+  id         String   @id @default(cuid())
+  planType   PlanType
+  featureKey String
+  enabled    Boolean  @default(true)
+  limit      Int?
+  createdAt  DateTime @default(now())
+
+  @@unique([planType, featureKey])
+  @@index([planType])
+}
+
+////////////////////////////////////////////////////////////
+/// CHAIN GOVERNANCE (Master Control Panel)
+////////////////////////////////////////////////////////////
+
+enum ControlMode {
+  CENTRALIZED
+  CAMPUS_AUTONOMOUS
+}
+
+model OrganizationControlPolicy {
+  organizationId       String      @id @db.VarChar(11)
+  feeControlMode       ControlMode @default(CAMPUS_AUTONOMOUS)
+  academicControlMode  ControlMode @default(CAMPUS_AUTONOMOUS)
+  messagingControlMode ControlMode @default(CAMPUS_AUTONOMOUS)
+  postingControlMode   ControlMode @default(CAMPUS_AUTONOMOUS)
+  updatedAt            DateTime    @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model FeeTemplate {
+  id             String       @id @default(cuid())
+  organizationId String       @db.VarChar(11)
+  name           String
+  amount         Decimal      @db.Decimal(12, 2)
+  frequency      FeeFrequency @default(MONTHLY)
+  applicableGrade String?
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive])
+}
+
+model CampusHealthScore {
+  organizationId   String  @db.VarChar(11)
+  campusId         Int     @unique
+  collectionRate   Decimal @default(0) @db.Decimal(5, 2)
+  attendanceRate   Decimal @default(0) @db.Decimal(5, 2)
+  academicScore    Decimal @default(0) @db.Decimal(5, 2)
+  enrollmentGrowth Decimal @default(0) @db.Decimal(5, 2)
+  compositeScore   Decimal @default(0) @db.Decimal(5, 2)
+  riskLevel        String  @default("LOW")
+  updatedAt        DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campus       Campus       @relation(fields: [campusId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, campusId])
+}
+
+model CampusOperationalStatus {
+  campusId          Int      @id
+  isFinancialLocked Boolean  @default(false)
+  isAcademicLocked  Boolean  @default(false)
+  lockReason        String?
+  lockedByUserId    Int?
+  lockedAt          DateTime?
+  updatedAt         DateTime @updatedAt
+
+  campus Campus @relation(fields: [campusId], references: [id], onDelete: Cascade)
+}
+
+////////////////////////////////////////////////////////////
+/// ORGANIZATION ID SEQUENCE (Race-safe)
+////////////////////////////////////////////////////////////
+
+model OrganizationSequence {
+  id        Int @id @default(1)
+  lastValue Int @default(0)
+}
+
+////////////////////////////////////////////////////////////
+/// ORGANIZATION (TENANT ROOT — Flat Single Table)
+////////////////////////////////////////////////////////////
+
+model Organization {
+  /// System
+  id             String             @id @db.VarChar(11)
+  slug           String             @unique
+  status         OrganizationStatus @default(ACTIVE)
+  mode           String             @default("SIMPLE")
+  isDemo         Boolean            @default(false)
+  onboardingStep OnboardingStep     @default(ORG_IDENTITY)
+
+  createdByUserId Int
+  createdBy       User @relation("OrgCreator", fields: [createdByUserId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Core Identity (Step 1: ORG_IDENTITY)
+  organizationName      String
+  displayName           String
+  organizationCategory  OrganizationCategory
+  organizationStructure OrganizationStructure
+
+  /// Legal (Step 2: LEGAL — nullable until filled)
+  registrationNumber String?
+  taxNumber          String?
+  establishedDate    DateTime? @db.Date
+
+  /// HQ Address (Step 3: CONTACT_ADDRESS — nullable until filled)
+  addressLine1  String?
+  addressLine2  String?
+  country       String?
+  provinceState String?
+  district      String?
+  tehsil        String?
+  city          String?
+  postalCode    String?
+
+  /// Contact (Step 3: CONTACT_ADDRESS — nullable until filled)
+  organizationEmail    String?
+  organizationPhone    String?
+  organizationMobile   String?
+  organizationWhatsApp String?
+  websiteUrl           String?
+
+  /// Branding (Step 4: BRANDING — always optional)
+  logoUrl       String?
+  logoKey       String?
+  logoUpdatedAt DateTime?
+  logoLightUrl  String?
+  logoDarkUrl   String?
+  logoPrintUrl  String?
+  primaryColor  String? @db.VarChar(7)
+  accentColor   String? @db.VarChar(7)
+  themeMode     String? @default("light")
+
+  /// Finance
+  financeRoutingMode FinanceRoutingMode @default(CAMPUS_PRIMARY)
+  timezone           String             @default("Asia/Karachi")
+  demoSeededAt      DateTime?
+
+  // Relations
+  memberships Membership[]
+  mediaAssets MediaAsset[]
+  invitations Invitation[]
+  jobs        Job[]
+
+  contacts     OrganizationContact[]
+  addresses    OrganizationAddress[]
+  bankAccounts OrganizationBank[]
+
+  campuses      Campus[]
+  students      Student[]
+  feeHeads      FeeHead[]
+  feeStructures FeeStructure[]
+  feeChallans   FeeChallan[]
+
+  regions            Region[]
+  subRegions         SubRegion[]
+  cities             City[]
+  zones              Zone[]
+  unitCodeSequences  UnitCodeSequence[]
+  unitProfiles       UnitProfile[]
+  unitBankAccounts   UnitBankAccount[]
+  rbacAuditLogs      RbacAuditLog[]
+  paymentRecords     PaymentRecord[]
+  ledgerEntries      LedgerEntry[]
+  financialSummaries StudentFinancialSummary[]
+  postingRuns        PostingRun[]
+  revenueCycles      RevenueCycle[]
+  revenueAdjustments RevenueAdjustment[]
+  reminderRules      ReminderRule[]
+  reminderLogs       ReminderLog[]
+  academicYears      AcademicYear[]
+  studentEnrollments StudentEnrollment[]
+  classes            Class[]
+  sections           Section[]
+  attendances        Attendance[]
+  subjects           Subject[]
+  exams              Exam[]
+  examResults        StudentExamResult[]
+  gradeScales        GradeScale[]
+  promotionRuns      PromotionRun[]
+  domainEventLogs    DomainEventLog[]
+  qrTokens           QrToken[]
+  onboardingProgress OnboardingProgress?
+  dashboardActions   DashboardAction[]
+  paymentConfig      OrganizationPaymentConfig?
+  messageTemplates   MessageTemplate[]
+  plan               OrganizationPlan?
+  controlPolicy      OrganizationControlPolicy?
+  feeTemplates       FeeTemplate[]
+  campusHealthScores CampusHealthScore[]
+  dailyStats         OrganizationDailyStats[]
+
+  @@index([status])
+}
+
+model OrganizationDailyStats {
+  organizationId    String   @db.VarChar(11)
+  date              DateTime
+  studentCount      Int      @default(0)
+  totalRevenue      Float    @default(0)
+  attendanceCount   Int      @default(0)
+  challanCount      Int      @default(0)
+  outstandingAmount Float    @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, date])
+  @@index([organizationId])
+}
+
+////////////////////////////////////////////////////////////
+/// ORGANIZATION CONTACTS
+////////////////////////////////////////////////////////////
+
+model OrganizationContact {
+  id             Int    @id @default(autoincrement())
+  organizationId String
+
+  name        String
+  designation String?
+  email       String?
+  phone       String?
+
+  isPrimary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+////////////////////////////////////////////////////////////
+/// ORGANIZATION ADDRESSES
+////////////////////////////////////////////////////////////
+
+model OrganizationAddress {
+  id             Int    @id @default(autoincrement())
+  organizationId String
+
+  type AddressType
+
+  country    String
+  province   String
+  city       String
+  area       String?
+  postalCode String?
+
+  addressLine1 String
+  addressLine2 String?
+
+  isPrimary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+////////////////////////////////////////////////////////////
+/// ORGANIZATION BANK ACCOUNTS
+////////////////////////////////////////////////////////////
+
+model OrganizationBank {
+  id             Int    @id @default(autoincrement())
+  organizationId String
+
+  accountTitle  String
+  bankName      String
+  branchName    String?
+  accountNumber String
+  iban          String?
+  swiftCode     String?
+
+  isPrimary Boolean @default(false)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+////////////////////////////////////////////////////////////
+/// UNIT CODE SEQUENCE (Race-safe auto-increment per scope)
+////////////////////////////////////////////////////////////
+
+model UnitCodeSequence {
+  id             String        @id @default(cuid())
+  scopeType      UnitScopeType
+  scopeId        String?
+  organizationId String        @db.VarChar(11)
+  lastValue      Int           @default(0)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, scopeType, scopeId])
+}
+
+////////////////////////////////////////////////////////////
+/// GEO HIERARCHY: Region → SubRegion → City → Zone
+////////////////////////////////////////////////////////////
+
+model Region {
+  id             String     @id @default(cuid())
+  name           String
+  unitCode       String     @db.VarChar(5)
+  organizationId String     @db.VarChar(11)
+  status         UnitStatus @default(ACTIVE)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  subRegions   SubRegion[]
+  cities       City[]
+
+  @@unique([organizationId, unitCode])
+}
+
+model SubRegion {
+  id             String     @id @default(cuid())
+  name           String
+  unitCode       String     @db.VarChar(5)
+  organizationId String     @db.VarChar(11)
+  status         UnitStatus @default(ACTIVE)
+
+  regionId String?
+  region   Region? @relation(fields: [regionId], references: [id])
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  cities       City[]
+
+  @@unique([organizationId, regionId, unitCode])
+}
+
+model City {
+  id             String     @id @default(cuid())
+  name           String
+  unitCode       String     @db.VarChar(5)
+  organizationId String     @db.VarChar(11)
+  status         UnitStatus @default(ACTIVE)
+
+  regionId    String?
+  subRegionId String?
+
+  region       Region?      @relation(fields: [regionId], references: [id])
+  subRegion    SubRegion?   @relation(fields: [subRegionId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  zones    Zone[]
+  campuses Campus[]
+
+  @@unique([organizationId, unitCode])
+}
+
+model Zone {
+  id             String     @id @default(cuid())
+  name           String
+  unitCode       String     @db.VarChar(5)
+  organizationId String     @db.VarChar(11)
+  status         UnitStatus @default(ACTIVE)
+
+  cityId String
+  city   City   @relation(fields: [cityId], references: [id])
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  campuses     Campus[]
+
+  @@unique([organizationId, cityId, unitCode])
+}
+
+////////////////////////////////////////////////////////////
+/// CAMPUS (Operational Unit)
+////////////////////////////////////////////////////////////
+
+model Campus {
+  id             Int          @id @default(autoincrement())
+  organizationId String       @db.VarChar(11)
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  campusCode     String       @unique
+  campusSlug     String       @unique
+  unitCode       String       @db.VarChar(5)
+  fullUnitPath   String       @db.VarChar(50)
+  address        String?
+
+  cityId String
+  city   City   @relation(fields: [cityId], references: [id])
+
+  zoneId String?
+  zone   Zone?   @relation(fields: [zoneId], references: [id])
+
+  principalName      String?
+  contactPhone       String?
+  email              String?
+  academicStartMonth Int       @default(8)
+  isMainCampus       Boolean   @default(false)
+  status             String    @default("ACTIVE")
+  createdAt          DateTime  @default(now())
+  deletedAt          DateTime?
+
+  memberships   Membership[]
+  students      Student[]
+  feeStructures FeeStructure[]
+  feeChallans   FeeChallan[]
+  ledgerEntries LedgerEntry[]
+  reminderRules ReminderRule[]
+  enrollments   StudentEnrollment[]
+  classes       Class[]
+  sections      Section[]
+  attendances   Attendance[]
+  subjects      Subject[]
+  exams              Exam[]
+  healthScore        CampusHealthScore?
+  operationalStatus  CampusOperationalStatus?
+
+  @@index([fullUnitPath])
+}
+
+////////////////////////////////////////////////////////////
+/// UNIT ADMINISTRATION (Profile, Contacts, Addresses)
+////////////////////////////////////////////////////////////
+
+model UnitProfile {
+  id             String        @id @default(cuid())
+  organizationId String        @db.VarChar(11)
+  unitType       UnitScopeType
+  unitId         String
+
+  displayName String?
+  email       String?
+  phone       String?
+  mobile      String?
+  whatsapp    String?
+  websiteUrl  String?
+  logoUrl     String?
+
+  status UnitStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contacts     UnitContact[]
+  addresses    UnitAddress[]
+  bankAccounts UnitBankAccount[]
+
+  @@unique([unitType, unitId])
+  @@index([organizationId])
+}
+
+model UnitContact {
+  id            String @id @default(cuid())
+  unitProfileId String
+
+  name        String
+  designation String?
+  email       String?
+  phone       String?
+  mobile      String?
+
+  isPrimary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  unitProfile UnitProfile @relation(fields: [unitProfileId], references: [id], onDelete: Cascade)
+
+  @@index([unitProfileId])
+}
+
+model UnitAddress {
+  id            String @id @default(cuid())
+  unitProfileId String
+
+  country      String
+  province     String
+  city         String
+  area         String?
+  addressLine1 String
+  addressLine2 String?
+  postalCode   String?
+
+  isPrimary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  unitProfile UnitProfile @relation(fields: [unitProfileId], references: [id], onDelete: Cascade)
+
+  @@index([unitProfileId])
+}
+
+////////////////////////////////////////////////////////////
+/// UNIT BANK ACCOUNTS (Financial Identity per Unit)
+////////////////////////////////////////////////////////////
+
+model UnitBankAccount {
+  id String @id @default(cuid())
+
+  organizationId String @db.VarChar(11)
+  unitProfileId  String
+
+  bankName   String
+  branchName String?
+  branchCode String?
+
+  accountTitle  String
+  accountNumber String
+  iban          String? @db.VarChar(34)
+
+  swiftCode String? @db.VarChar(11)
+
+  isPrimary Boolean @default(false)
+
+  status UnitStatus @default(ACTIVE)
+
+  notes String? @db.VarChar(500)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  unitProfile    UnitProfile     @relation(fields: [unitProfileId], references: [id], onDelete: Cascade)
+  feeChallans    FeeChallan[]
+  paymentRecords PaymentRecord[]
+
+  @@index([organizationId])
+  @@index([unitProfileId])
+  @@index([status])
+}
+
+////////////////////////////////////////////////////////////
+/// MEMBERSHIP (TENANT RBAC BRIDGE)
+////////////////////////////////////////////////////////////
+
+model Membership {
+  id Int @id @default(autoincrement())
+
+  userId         Int
+  organizationId String
+
+  role   MembershipRole
+  status MembershipStatus @default(ACTIVE)
+
+  campusId Int?
+
+  unitId   String?
+  unitPath String? @db.VarChar(50)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  campus       Campus?      @relation(fields: [campusId], references: [id])
+
+  classTeacherSections Section[]
+  attendancesMarked    Attendance[] @relation("AttendanceMarker")
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@index([unitPath])
+  @@index([role, unitPath])
+}
+
+////////////////////////////////////////////////////////////
+/// INVITATIONS
+////////////////////////////////////////////////////////////
+
+model Invitation {
+  id Int @id @default(autoincrement())
+
+  email          String
+  organizationId String
+  role           MembershipRole
+
+  token String @unique
+
+  invitedById Int
+  invitedBy   User @relation(fields: [invitedById], references: [id])
+
+  expiresAt  DateTime
+  acceptedAt DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+}
+
+////////////////////////////////////////////////////////////
+/// PASSWORD RESET TOKENS
+////////////////////////////////////////////////////////////
+
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id])
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+////////////////////////////////////////////////////////////
+/// STUDENT
+////////////////////////////////////////////////////////////
+
+model Student {
+  id          Int    @id @default(autoincrement())
+  fullName    String
+  admissionNo String @unique
+  grade       String
+  feeStatus   String @default("Unpaid")
+
+  organizationId String       @db.VarChar(11)
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  campusId       Int
+  campus         Campus       @relation(fields: [campusId], references: [id])
+
+  feeChallans      FeeChallan[]
+  ledgerEntries    LedgerEntry[]
+  financialSummary StudentFinancialSummary?
+  reminderLogs     ReminderLog[]
+  enrollments      StudentEnrollment[]
+  attendances      Attendance[]
+  examResults      StudentExamResult[]
+}
+
+model StudentFinancialSummary {
+  studentId      Int    @id
+  organizationId String @db.VarChar(11)
+  campusId       Int
+
+  totalDebit  Decimal @default(0) @db.Decimal(12, 2)
+  totalCredit Decimal @default(0) @db.Decimal(12, 2)
+  balance     Decimal @default(0) @db.Decimal(12, 2)
+
+  updatedAt DateTime @updatedAt
+
+  student      Student      @relation(fields: [studentId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([organizationId, campusId])
+  @@index([balance])
+}
+
+////////////////////////////////////////////////////////////
+/// ACADEMIC YEAR (Session Isolation)
+////////////////////////////////////////////////////////////
+
+model AcademicYear {
+  id             String @id @default(cuid())
+  organizationId String @db.VarChar(11)
+
+  name      String
+  startDate DateTime
+  endDate   DateTime
+
+  status   AcademicYearStatus @default(DRAFT)
+  isActive Boolean            @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  enrollments    StudentEnrollment[]
+  classes        Class[]
+  sections       Section[]
+  feeChallans    FeeChallan[]
+  ledgerEntries  LedgerEntry[]
+  postingRuns    PostingRun[]
+  attendances    Attendance[]
+  subjects       Subject[]
+  exams          Exam[]
+  promotionsFrom PromotionRun[]      @relation("PromotionFrom")
+  promotionsTo   PromotionRun[]      @relation("PromotionTo")
+
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive])
+}
+
+////////////////////////////////////////////////////////////
+/// CLASS (Year-Aware Grade Level)
+////////////////////////////////////////////////////////////
+
+model Class {
+  id             String @id @default(cuid())
+  organizationId String @db.VarChar(11)
+  academicYearId String
+  campusId       Int
+
+  name         String
+  code         String?
+  displayOrder Int?
+
+  status UnitStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  campus       Campus       @relation(fields: [campusId], references: [id], onDelete: Cascade)
+
+  sections    Section[]
+  enrollments StudentEnrollment[]
+  attendances Attendance[]
+  subjects    Subject[]
+  exams       Exam[]
+
+  @@unique([academicYearId, campusId, name])
+  @@index([organizationId, academicYearId])
+  @@index([campusId, academicYearId])
+}
+
+////////////////////////////////////////////////////////////
+/// SECTION (Year-Aware Classroom Unit)
+////////////////////////////////////////////////////////////
+
+model Section {
+  id             String @id @default(cuid())
+  organizationId String @db.VarChar(11)
+  academicYearId String
+  campusId       Int
+  classId        String
+
+  name     String
+  capacity Int?
+
+  classTeacherId Int?
+
+  status UnitStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  campus       Campus       @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  class        Class        @relation(fields: [classId], references: [id], onDelete: Cascade)
+  classTeacher Membership?  @relation(fields: [classTeacherId], references: [id])
+
+  enrollments StudentEnrollment[]
+  attendances Attendance[]
+  exams       Exam[]
+
+  @@unique([classId, name])
+  @@index([organizationId, academicYearId])
+  @@index([campusId, academicYearId])
+}
+
+////////////////////////////////////////////////////////////
+/// STUDENT ENROLLMENT (Year-Based Class Placement)
+////////////////////////////////////////////////////////////
+
+model StudentEnrollment {
+  id             String @id @default(cuid())
+  organizationId String @db.VarChar(11)
+
+  studentId      Int
+  academicYearId String
+  campusId       Int
+  classId        String
+  sectionId      String?
+
+  rollNumber    String?
+  admissionDate DateTime?
+
+  status EnrollmentStatus @default(ACTIVE)
+
+  promotedFromId String?
+
+  enrolledAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  student      Student      @relation(fields: [studentId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  campus       Campus       @relation(fields: [campusId], references: [id])
+  class        Class        @relation(fields: [classId], references: [id])
+  section      Section?     @relation(fields: [sectionId], references: [id])
+
+  promotedFrom StudentEnrollment?  @relation("PromotionChain", fields: [promotedFromId], references: [id])
+  promotedTo   StudentEnrollment[] @relation("PromotionChain")
+
+  attendances Attendance[]
+  examResults StudentExamResult[]
+
+  @@unique([studentId, academicYearId])
+  @@index([organizationId, academicYearId])
+  @@index([campusId, academicYearId])
+  @@index([classId])
+  @@index([sectionId])
+  @@index([status])
+  @@index([promotedFromId])
+}
+
+////////////////////////////////////////////////////////////
+/// ATTENDANCE (Section-Scoped, Year-Aware)
+////////////////////////////////////////////////////////////
+
+model Attendance {
+  id             String @id @default(cuid())
+  organizationId String @db.VarChar(11)
+  academicYearId String
+  campusId       Int
+  classId        String
+  sectionId      String
+
+  enrollmentId String
+  studentId    Int
+
+  date   DateTime         @db.Date
+  status AttendanceStatus
+
+  remarks String?
+
+  markedById Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear      @relation(fields: [academicYearId], references: [id])
+  campus       Campus            @relation(fields: [campusId], references: [id])
+  class        Class             @relation(fields: [classId], references: [id])
+  section      Section           @relation(fields: [sectionId], references: [id])
+  enrollment   StudentEnrollment @relation(fields: [enrollmentId], references: [id])
+  student      Student           @relation(fields: [studentId], references: [id])
+  markedBy     Membership?       @relation("AttendanceMarker", fields: [markedById], references: [id])
+
+  @@unique([enrollmentId, date])
+  @@index([organizationId, academicYearId])
+  @@index([sectionId, date])
+  @@index([studentId, date])
+  @@index([campusId, date])
+  @@index([date])
+}
+
+////////////////////////////////////////////////////////////
+/// SUBJECT (Year-Aware, Class-Scoped)
+////////////////////////////////////////////////////////////
+
+model Subject {
+  id             String @id @default(cuid())
+  organizationId String @db.VarChar(11)
+  academicYearId String
+  campusId       Int
+  classId        String
+
+  name   String
+  code   String?
+  status UnitStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  campus       Campus       @relation(fields: [campusId], references: [id])
+  class        Class        @relation(fields: [classId], references: [id])
+
+  examSubjects ExamSubject[]
+
+  @@unique([academicYearId, classId, name])
+  @@index([organizationId, academicYearId])
+  @@index([classId])
+}
+
+////////////////////////////////////////////////////////////
+/// EXAM (Year-Aware, Section-Scoped)
+////////////////////////////////////////////////////////////
+
+model Exam {
+  id             String  @id @default(cuid())
+  organizationId String  @db.VarChar(11)
+  academicYearId String
+  campusId       Int
+  classId        String
+  sectionId      String?
+
+  name      String
+  examType  ExamType
+  startDate DateTime
+  endDate   DateTime
+
+  totalMarks Decimal? @db.Decimal(8, 2)
+
+  status ExamStatus @default(DRAFT)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  campus       Campus       @relation(fields: [campusId], references: [id])
+  class        Class        @relation(fields: [classId], references: [id])
+  section      Section?     @relation(fields: [sectionId], references: [id])
+
+  examSubjects ExamSubject[]
+  results      StudentExamResult[]
+
+  @@index([organizationId, academicYearId])
+  @@index([campusId, academicYearId])
+  @@index([classId])
+  @@index([status])
+}
+
+////////////////////////////////////////////////////////////
+/// EXAM SUBJECT (Marks Configuration per Exam)
+////////////////////////////////////////////////////////////
+
+model ExamSubject {
+  id        String @id @default(cuid())
+  examId    String
+  subjectId String
+
+  totalMarks   Decimal @db.Decimal(6, 2)
+  passingMarks Decimal @db.Decimal(6, 2)
+
+  exam    Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  results StudentExamResult[]
+
+  @@unique([examId, subjectId])
+  @@index([examId])
+  @@index([subjectId])
+}
+
+////////////////////////////////////////////////////////////
+/// STUDENT EXAM RESULT (Per Subject Per Student)
+////////////////////////////////////////////////////////////
+
+model StudentExamResult {
+  id             String @id @default(cuid())
+  organizationId String @db.VarChar(11)
+  academicYearId String
+
+  examId        String
+  examSubjectId String
+  enrollmentId  String
+  studentId     Int
+
+  obtainedMarks Decimal @db.Decimal(6, 2)
+  grade         String?
+  remarks       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  exam         Exam              @relation(fields: [examId], references: [id], onDelete: Cascade)
+  examSubject  ExamSubject       @relation(fields: [examSubjectId], references: [id], onDelete: Cascade)
+  enrollment   StudentEnrollment @relation(fields: [enrollmentId], references: [id])
+  student      Student           @relation(fields: [studentId], references: [id])
+
+  @@unique([examSubjectId, enrollmentId])
+  @@index([examId])
+  @@index([enrollmentId])
+  @@index([studentId, academicYearId])
+}
+
+////////////////////////////////////////////////////////////
+/// GRADE SCALE (Organization-Level Grading System)
+////////////////////////////////////////////////////////////
+
+model GradeScale {
+  id             String @id @default(cuid())
+  organizationId String @db.VarChar(11)
+
+  name          String
+  minPercentage Decimal  @db.Decimal(5, 2)
+  maxPercentage Decimal  @db.Decimal(5, 2)
+  grade         String
+  gradePoint    Decimal? @db.Decimal(3, 2)
+
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([organizationId, minPercentage])
+}
+
+////////////////////////////////////////////////////////////
+/// PROMOTION RUN (Year Rollover Idempotency Guard)
+////////////////////////////////////////////////////////////
+
+model PromotionRun {
+  id             String @id @default(cuid())
+  organizationId String @db.VarChar(11)
+
+  fromAcademicYearId String
+  toAcademicYearId   String
+
+  status PromotionRunStatus @default(PENDING)
+
+  totalStudents Int @default(0)
+  promoted      Int @default(0)
+  retained      Int @default(0)
+  graduated     Int @default(0)
+  errors        Int @default(0)
+
+  errorMessage String?
+
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  initiatedByUserId Int
+
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fromAcademicYear AcademicYear @relation("PromotionFrom", fields: [fromAcademicYearId], references: [id])
+  toAcademicYear   AcademicYear @relation("PromotionTo", fields: [toAcademicYearId], references: [id])
+  initiatedBy      User         @relation(fields: [initiatedByUserId], references: [id])
+
+  @@unique([organizationId, fromAcademicYearId])
+  @@index([organizationId])
+  @@index([status])
+}
+
+////////////////////////////////////////////////////////////
+/// FEE POSTING RUN (Idempotency Guard)
+////////////////////////////////////////////////////////////
+
+model PostingRun {
+  id             String @id @default(cuid())
+  organizationId String @db.VarChar(11)
+
+  month Int
+  year  Int
+
+  campusId       Int?
+  academicYearId String?
+
+  status      PostingRunStatus @default(PENDING)
+  startedAt   DateTime         @default(now())
+  completedAt DateTime?
+
+  totalStudents Int     @default(0)
+  totalChallans Int     @default(0)
+  totalAmount   Decimal @default(0) @db.Decimal(12, 2)
+
+  errorMessage String?
+
+  createdByUserId Int?
+  createdByUser   User?         @relation(fields: [createdByUserId], references: [id])
+  organization    Organization  @relation(fields: [organizationId], references: [id])
+  academicYear    AcademicYear? @relation(fields: [academicYearId], references: [id])
+
+  @@unique([organizationId, month, year])
+  @@index([organizationId])
+  @@index([status])
+}
+
+model RevenueCycle {
+  id             String @id @default(cuid())
+  organizationId String @db.VarChar(11)
+
+  month Int
+  year  Int
+
+  revenueCalculationModeUsed RevenueCalculationMode
+  perStudentFeeUsed          Decimal                @db.Decimal(12, 2)
+  closingDayUsed             Int                    @default(10)
+  totalStudents              Int                    @default(0)
+  generatedAmount            Decimal                @default(0) @db.Decimal(12, 2)
+  collectedAmount            Decimal                @default(0) @db.Decimal(12, 2)
+  sairexRevenue              Decimal                @default(0) @db.Decimal(12, 2)
+  status                     RevenueCycleStatus     @default(OPEN)
+
+  closedAt   DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  adjustments  RevenueAdjustment[]
+
+  @@unique([organizationId, month, year])
+  @@index([organizationId, status])
+}
+
+model RevenueAdjustment {
+  id             String @id @default(cuid())
+  revenueCycleId String
+  organizationId String @db.VarChar(11)
+  amount         Decimal @db.Decimal(12, 2)
+  reason         String
+  createdBy      String
+  createdAt      DateTime @default(now())
+
+  revenueCycle RevenueCycle @relation(fields: [revenueCycleId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([revenueCycleId])
+  @@index([organizationId, createdAt])
+}
+
+////////////////////////////////////////////////////////////
+/// REMINDER ENGINE (Automated Collection)
+////////////////////////////////////////////////////////////
+
+model ReminderRule {
+  id             String @id @default(cuid())
+  organizationId String @db.VarChar(11)
+  campusId       Int?
+
+  name           String
+  triggerType    ReminderTriggerType @default(AFTER_DUE)
+  daysOffset     Int                 @default(0)
+  minDaysOverdue Int
+  maxDaysOverdue Int?
+
+  channel     ReminderChannel
+  templateKey String?
+  template    String          @db.Text
+
+  frequencyDays Int @default(7)
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  campus       Campus?       @relation(fields: [campusId], references: [id])
+  reminderLogs ReminderLog[]
+
+  @@index([organizationId, isActive])
+}
+
+model ReminderLog {
+  id             String @id @default(cuid())
+  organizationId String @db.VarChar(11)
+  studentId      Int
+  challanId      Int?
+  reminderRuleId String
+
+  channel     ReminderChannel
+  triggerType ReminderTriggerType?
+  sentAt      DateTime             @default(now())
+  status      ReminderStatus
+  deliveredAt DateTime?
+  readAt      DateTime?
+
+  messageBody String? @db.Text
+  paymentLink String?
+  externalRef String?
+  errorDetail String?
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  student      Student      @relation(fields: [studentId], references: [id])
+  challan      FeeChallan?  @relation(fields: [challanId], references: [id])
+  reminderRule ReminderRule @relation(fields: [reminderRuleId], references: [id])
+
+  @@unique([organizationId, challanId, reminderRuleId])
+  @@index([studentId, reminderRuleId, sentAt])
+  @@index([externalRef])
+  @@index([organizationId])
+  @@index([challanId])
+}
+
+////////////////////////////////////////////////////////////
+/// MESSAGE TEMPLATE (Reusable Notification Templates)
+////////////////////////////////////////////////////////////
+
+model MessageTemplate {
+  id             String          @id @default(cuid())
+  organizationId String          @db.VarChar(11)
+  channel        ReminderChannel
+  templateKey    String
+  name           String
+  content        String          @db.Text
+  isDefault      Boolean         @default(false)
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, channel, templateKey])
+  @@index([organizationId, channel])
+}
+
+////////////////////////////////////////////////////////////
+/// FEE MODULE
+////////////////////////////////////////////////////////////
+
+model FeeHead {
+  id              Int          @id @default(autoincrement())
+  organizationId  String       @db.VarChar(11)
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  name            String
+  type            String
+  isSystemDefault Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+
+  structures FeeStructure[]
+}
+
+model FeeStructure {
+  id             Int          @id @default(autoincrement())
+  organizationId String       @db.VarChar(11)
+  campusId       Int
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  campus         Campus       @relation(fields: [campusId], references: [id])
+
+  feeHeadId Int
+  feeHead   FeeHead @relation(fields: [feeHeadId], references: [id])
+
+  name      String
+  amount    Decimal      @default(0.00) @db.Decimal(12, 2)
+  currency  String       @default("PKR")
+  frequency FeeFrequency @default(MONTHLY)
+
+  applicableGrade String?
+  startMonth      Int?
+  endMonth        Int?
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  feeChallans FeeChallan[]
+
+  @@index([organizationId, isActive])
+}
+
+model FeeChallan {
+  id             Int          @id @default(autoincrement())
+  organizationId String       @db.VarChar(11)
+  campusId       Int
+  studentId      Int
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  campus         Campus       @relation(fields: [campusId], references: [id])
+  student        Student      @relation(fields: [studentId], references: [id])
+
+  challanNo String   @unique
+  issueDate DateTime @default(now())
+  dueDate   DateTime
+
+  totalAmount Decimal       @db.Decimal(12, 2)
+  paidAmount  Decimal       @default(0.00) @db.Decimal(12, 2)
+  status      ChallanStatus @default(UNPAID)
+
+  paymentMethod String?
+  paidAt        DateTime?
+
+  generatedBy String
+
+  month          Int?
+  year           Int?
+  feeStructureId Int?
+  feeStructure   FeeStructure? @relation(fields: [feeStructureId], references: [id])
+
+  academicYearId String?
+  academicYear   AcademicYear? @relation(fields: [academicYearId], references: [id])
+
+  bankAccountId String?
+  bankAccount   UnitBankAccount? @relation(fields: [bankAccountId], references: [id])
+
+  paymentRecords PaymentRecord[]
+  ledgerEntries  LedgerEntry[]
+  reminderLogs   ReminderLog[]
+
+  @@unique([studentId, month, year, feeStructureId])
+  @@index([bankAccountId])
+  @@index([organizationId])
+  @@index([studentId])
+  @@index([status])
+  @@index([feeStructureId])
+  @@index([academicYearId])
+}
+
+////////////////////////////////////////////////////////////
+/// PAYMENT GATEWAY CONFIG (Per-Organization)
+////////////////////////////////////////////////////////////
+
+model OrganizationPaymentConfig {
+  id             String         @id @default(cuid())
+  organizationId String         @unique @db.VarChar(11)
+  primaryGateway PaymentGateway @default(MANUAL)
+  enabledJson    Json           @default("[]")
+  configJson     Json?
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+////////////////////////////////////////////////////////////
+/// PAYMENT RECORD (Raw Incoming Money)
+////////////////////////////////////////////////////////////
+
+model PaymentRecord {
+  id             String  @id @default(cuid())
+  organizationId String  @db.VarChar(11)
+  bankAccountId  String?
+
+  amount   Decimal @db.Decimal(12, 2)
+  currency String  @default("PKR")
+
+  transactionRef String?
+  paymentChannel PaymentChannel
+
+  gateway        PaymentGateway @default(MANUAL)
+  gatewayRef     String?
+  gatewayPayload Json?
+
+  paidAt     DateTime?
+  receivedAt DateTime  @default(now())
+
+  status PaymentStatus @default(PENDING)
+
+  rawPayload Json?
+
+  challanId Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id])
+  bankAccount  UnitBankAccount? @relation(fields: [bankAccountId], references: [id])
+  challan      FeeChallan?      @relation(fields: [challanId], references: [id])
+
+  @@unique([gateway, gatewayRef])
+  @@index([organizationId])
+  @@index([transactionRef])
+  @@index([challanId])
+  @@index([status])
+  @@index([gatewayRef])
+}
+
+////////////////////////////////////////////////////////////
+/// LEDGER ENTRY (Financial Truth Layer)
+////////////////////////////////////////////////////////////
+
+model LedgerEntry {
+  id             String @id @default(cuid())
+  organizationId String @db.VarChar(11)
+  studentId      Int?
+  campusId       Int?
+  challanId      Int?
+
+  entryType LedgerEntryType
+  direction LedgerDirection
+  amount    Decimal         @db.Decimal(12, 2)
+
+  referenceId   String?
+  referenceType String?
+
+  notes String?
+
+  academicYearId String?
+
+  entryDate DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  student      Student?      @relation(fields: [studentId], references: [id])
+  campus       Campus?       @relation(fields: [campusId], references: [id])
+  challan      FeeChallan?   @relation(fields: [challanId], references: [id])
+  academicYear AcademicYear? @relation(fields: [academicYearId], references: [id])
+
+  @@index([organizationId, studentId])
+  @@index([studentId, entryDate])
+  @@index([challanId])
+  @@index([campusId])
+  @@index([entryType])
+  @@index([academicYearId])
+}
+
+////////////////////////////////////////////////////////////
+/// BACKGROUND JOB (Queue Audit Trail)
+////////////////////////////////////////////////////////////
+
+model Job {
+  id          String    @id @default(cuid())
+  type        String // EMAIL, SMS, WHATSAPP, CHALLAN_PDF, REPORT, IMPORT, OTP, MONTHLY_POSTING, RECONCILE_PAYMENT, PROMOTION_RUN, REMINDER_RUN, RECOVERY_SWEEP
+  queue       String    @default("default")
+  payload     Json
+  status      String    @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED, DEAD, RETRYING
+  priority    Int       @default(0)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  progress    Int? // 0–100 for long-running jobs
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  failedAt    DateTime?
+  error       String?
+  result      Json?
+
+  idempotencyKey String? @unique
+  referenceId    String?
+  referenceType  String?
+
+  organizationId String? @db.VarChar(11)
+  userId         Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  user         User?         @relation(fields: [userId], references: [id])
+
+  @@index([status, scheduledAt])
+  @@index([type, status])
+  @@index([organizationId])
+  @@index([queue, priority])
+  @@index([referenceId, referenceType])
+}
+
+model MobileActionLog {
+  id              String   @id @default(uuid())
+  organizationId  String   @db.VarChar(11)
+  userId          String
+  actionType      String
+  actionKey       String
+  lastShownAt     DateTime
+  lastActedAt     DateTime?
+  escalationLevel Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([organizationId, userId])
+  @@unique([organizationId, userId, actionKey])
+}
+
+model OperationalRiskSnapshot {
+  id             String   @id @default(uuid())
+  organizationId String   @db.VarChar(11)
+  score          Int
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([organizationId, createdAt])
+}
+
+model OperationalBriefSnapshot {
+  id             String   @id @default(uuid())
+  organizationId String   @db.VarChar(11)
+  text           String   @db.Text
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([organizationId, createdAt])
+}
+
+model OnboardingDraft {
+  id             String   @id @default(cuid())
+  token          String   @unique
+  schoolInfo     Json?
+  academicSetup  Json?
+  feeSetup       Json?
+  adminSetup     Json?
+  status         String   @default("DRAFT")
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+}
+
+////////////////////////////////////////////////////////////
+/// MEDIA ASSETS
+////////////////////////////////////////////////////////////
+
+model MediaAsset {
+  id             String       @id @default(cuid())
+  organizationId String       @db.VarChar(11)
+  type           MediaType
+  variant        MediaVariant @default(ORIGINAL)
+  url            String
+  key            String
+  size           Int
+  mimeType       String
+  width          Int?
+  height         Int?
+  originalName   String?
+  createdBy      String?
+  version        Int          @default(1)
+  createdAt      DateTime     @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, type])
+  @@index([organizationId, type, variant])
+}
+
+////////////////////////////////////////////////////////////
+/// RBAC AUDIT LOG
+////////////////////////////////////////////////////////////
+
+model RbacAuditLog {
+  id String @id @default(cuid())
+
+  organizationId String      @db.VarChar(11)
+  action         AuditAction
+
+  actorUserId  Int
+  targetUserId Int
+  membershipId Int
+
+  oldRole MembershipRole?
+  newRole MembershipRole?
+
+  oldUnitPath String? @db.VarChar(50)
+  newUnitPath String? @db.VarChar(50)
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User         @relation("AuditActor", fields: [actorUserId], references: [id])
+  target       User         @relation("AuditTarget", fields: [targetUserId], references: [id])
+
+  @@index([organizationId, createdAt])
+  @@index([membershipId])
+  @@index([targetUserId])
+}
+
+////////////////////////////////////////////////////////////
+/// DOMAIN EVENT LOG (Event-Driven Architecture)
+////////////////////////////////////////////////////////////
+
+model DomainEventLog {
+  id                String   @id @default(cuid())
+  organizationId    String   @db.VarChar(11)
+  eventType         String
+  payload           Json
+  occurredAt        DateTime
+  initiatedByUserId Int?
+  processed         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, eventType])
+  @@index([eventType, processed])
+  @@index([occurredAt])
+}

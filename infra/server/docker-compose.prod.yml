@@ -1,0 +1,142 @@
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: always
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.le.acme.tlschallenge=true"
+      - "--certificatesresolvers.le.acme.email=${TRAEFIK_ACME_EMAIL:-admin@sairexsms.com}"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./letsencrypt:/letsencrypt
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+
+  app:
+    image: ${SAIREX_IMAGE:-ghcr.io/YOUR_GITHUB_USERNAME/sairexsms-ops:latest}
+    container_name: sairex_app
+    restart: always
+    env_file:
+      - ${SAIREX_ENV_FILE:-.env}
+    depends_on:
+      traefik:
+        condition: service_started
+      redis:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sairex.rule=Host(`${SAIREX_APP_DOMAIN:-app.sairexsms.com}`)"
+      - "traefik.http.routers.sairex.entrypoints=websecure"
+      - "traefik.http.routers.sairex.tls.certresolver=le"
+      - "traefik.http.services.sairex.loadbalancer.server.port=3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1G
+
+  migrate:
+    image: ${SAIREX_IMAGE:-ghcr.io/YOUR_GITHUB_USERNAME/sairexsms-ops:latest}
+    container_name: sairex_migrate
+    command: sh -lc "npx prisma migrate deploy --schema ../prisma/schema.prisma"
+    restart: "no"
+    env_file:
+      - ${SAIREX_ENV_FILE:-.env}
+    depends_on:
+      db:
+        condition: service_started
+
+  worker:
+    image: ${SAIREX_IMAGE:-ghcr.io/YOUR_GITHUB_USERNAME/sairexsms-ops:latest}
+    container_name: sairex_worker
+    command: npm run worker
+    restart: always
+    env_file:
+      - ${SAIREX_ENV_FILE:-.env}
+    depends_on:
+      redis:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1G
+
+  db:
+    image: postgres:15
+    container_name: sairex_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sairex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGE_ME_STRONG_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-sairex}
+    volumes:
+      - ./volumes/postgres:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1G
+
+  redis:
+    image: redis:7
+    container_name: sairex_redis
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - ./volumes/redis:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+
+  uptime_kuma:
+    image: louislam/uptime-kuma
+    container_name: uptime_kuma
+    restart: always
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./volumes/uptime-kuma:/app/data
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M

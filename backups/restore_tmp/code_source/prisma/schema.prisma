@@ -1,0 +1,175 @@
+// This is your blueprint for SAIREX SMS
+
+generator client {
+  provider = "prisma-client-py"
+  enable_experimental_decimal = true
+}
+
+generator jsClient {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 1. Organization (The Tenant Root)
+model Organization {
+  id                Int              @id @default(autoincrement())
+  name              String
+  orgCode           String           @unique
+  logo              String?
+  website           String?
+  taxRegNo          String?
+  currency          String           @default("PKR")
+  timezone          String           @default("Asia/Karachi")
+  brandingJson      Json?            // Stores theme colors/settings
+  subscriptionPlan  String           @default("FREE")
+  subscriptionStatus String          @default("ACTIVE")
+  isActive          Boolean          @default(true)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  regionalOffices   RegionalOffice[]
+  campuses          Campus[]
+  users             User[]
+  students          Student[]
+  feeHeads          FeeHead[]
+  feeStructures     FeeStructure[]
+  feeChallans       FeeChallan[]
+}
+
+// 2. Regional Office (Optional Tier)
+model RegionalOffice {
+  id              Int          @id @default(autoincrement())
+  organizationId  Int
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  name            String
+  city            String
+  directorName    String?
+  contactEmail    String?
+  status          String       @default("ACTIVE")
+  campuses        Campus[]
+}
+
+// 3. Campus (Operational Unit)
+model Campus {
+  id                Int             @id @default(autoincrement())
+  organizationId    Int
+  organization      Organization    @relation(fields: [organizationId], references: [id])
+  regionId          Int?
+  region            RegionalOffice? @relation(fields: [regionId], references: [id])
+  name              String
+  campusCode        String          @unique
+  campusSlug        String          @unique
+  address           String?
+  city              String
+  principalName     String?
+  contactPhone      String?
+  email             String?
+  academicStartMonth Int            @default(8) // August
+  isMainCampus      Boolean         @default(false)
+  status            String          @default("ACTIVE")
+  createdAt         DateTime        @default(now())
+  deletedAt         DateTime?       // Soft delete
+
+  users             User[]
+  students          Student[]
+  feeStructures     FeeStructure[]
+  feeChallans       FeeChallan[]
+}
+
+// 4. Users (Scoped Access)
+model User {
+  id              Int          @id @default(autoincrement())
+  organizationId  Int
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  campusId        Int?
+  campus          Campus?      @relation(fields: [campusId], references: [id])
+  email           String       @unique
+  password        String
+  role            String       // SUPER_ADMIN, ORG_ADMIN, CAMPUS_ADMIN, TEACHER, PARENT
+  isActive        Boolean      @default(true)
+}
+
+// 5. Student
+model Student {
+  id             Int      @id @default(autoincrement())
+  fullName       String
+  admissionNo    String   @unique
+  grade          String
+  feeStatus      String   @default("Unpaid")
+  
+  // The SaaS Links
+  organizationId Int
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  campusId       Int
+  campus         Campus       @relation(fields: [campusId], references: [id])
+
+  feeChallans    FeeChallan[]
+}
+
+// --- FEE MODULE ---
+
+// 1. Fee Heads (The "Categories" of Money)
+// Examples: "Tuition Fee", "Transport Fee", "Lab Charges"
+model FeeHead {
+  id             Int          @id @default(autoincrement())
+  organizationId Int
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String       // e.g., "Monthly Tuition"
+  type           String       // RECURRING or ONE_TIME
+  isSystemDefault Boolean     @default(false) // True if copied from Global Template
+  createdAt      DateTime     @default(now())
+
+  structures     FeeStructure[]
+}
+
+// 2. Fee Structure (The "Rules")
+// Links a Fee Head to an Amount and Frequency for a specific context
+model FeeStructure {
+  id             Int          @id @default(autoincrement())
+  organizationId Int
+  campusId       Int
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  campus         Campus       @relation(fields: [campusId], references: [id])
+  
+  feeHeadId      Int
+  feeHead        FeeHead      @relation(fields: [feeHeadId], references: [id])
+  
+  name           String       // e.g., "Class 10 Tuition - 2026"
+  amount         Decimal      @default(0.00)
+  currency       String       @default("PKR")
+  frequency      String       // MONTHLY, QUARTERLY, ANNUALLY, ONCE
+  
+  // Who does this apply to?
+  applicableGrade String?     // e.g., "Grade 10" (Optional filter)
+  
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+}
+
+// 3. Fee Challan (The "Bill" sent to Student)
+model FeeChallan {
+  id             Int          @id @default(autoincrement())
+  organizationId Int
+  campusId       Int
+  studentId      Int
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  campus         Campus       @relation(fields: [campusId], references: [id])
+  student        Student      @relation(fields: [studentId], references: [id])
+  
+  challanNo      String       @unique // e.g., "CH-2026-0001"
+  issueDate      DateTime     @default(now())
+  dueDate        DateTime
+  
+  totalAmount    Decimal
+  paidAmount     Decimal      @default(0.00)
+  status         String       @default("UNPAID") // UNPAID, PARTIAL, PAID, OVERDUE
+  
+  paymentMethod  String?      // CASH, BANK_TRANSFER, ONLINE
+  paidAt         DateTime?
+  
+  generatedBy    String       // "SYSTEM_AUTO" or User ID
+}

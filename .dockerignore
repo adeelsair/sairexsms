@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.env*
+dist
+coverage
+**/node_modules
+**/.next
+**/.git
+backups
+venv
+.cursor
+web/.next

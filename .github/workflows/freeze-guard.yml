@@ -1,0 +1,26 @@
+name: Freeze Guard
+
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: freeze-guard-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  enforce-hotfix-branch:
+    name: Freeze Guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce hotfix source branch during freeze
+        env:
+          PR_HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [[ "$PR_HEAD_REF" != hotfix/* ]]; then
+            echo "Only hotfix/* branches can merge into main during release freeze."
+            echo "Current source branch: $PR_HEAD_REF"
+            exit 1
+          fi
+          echo "Freeze guard passed for branch: $PR_HEAD_REF"

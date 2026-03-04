@@ -1,0 +1,131 @@
+---
+description: SAIREX design system enforcement — hard bans and mandatory self-audit
+globs: web/app/admin/**/*.tsx, web/app/admin/**/*.ts
+alwaysApply: true
+---
+
+# SAIREX Component Standards — ENFORCED
+
+> **SEVERITY: BLOCKING**
+> Every rule below is a hard constraint. If ANY violation exists in code you
+> are writing or editing, you MUST fix it before finishing your response.
+> Do NOT explain why the ban exists. Just fix it.
+
+---
+
+## 1 — BANNED PATTERNS (Zero Tolerance)
+
+Before writing or editing ANY file matching `web/app/admin/**`, scan your
+output for every pattern in this table. If you find one, **stop and replace it
+immediately**. No exceptions. No "I'll fix it later."
+
+| # | BANNED pattern (regex) | Replacement | Import from |
+|---|------------------------|-------------|-------------|
+| B1 | `<table` or `<thead` or `<tbody` or `<tr` or `<td` or `<th` | `<SxDataTable>` | `@/components/sx` |
+| B2 | `<button` (raw HTML button) | `<SxButton>` | `@/components/sx` |
+| B3 | `<input` (raw HTML input) | `<Input>` | `@/components/ui/input` |
+| B4 | `<select` or `<option` (raw HTML) | `<Select>` + `<SelectItem>` | `@/components/ui/select` |
+| B5 | `alert(` or `window.alert(` or `confirm(` or `prompt(` | `toast` / `toast.error` / `toast.success` | `sonner` |
+| B6 | `fetch(` or `new Request(` (client-side) | `api.get` / `api.post` / `api.put` / `api.patch` / `api.delete` | `@/lib/api-client` |
+| B7 | Hardcoded Tailwind color classes (see §2) | Design tokens only (see §2) | — |
+| B8 | Inline form validation via `rules={{ }}` prop | `zodResolver` + Zod schema | `@hookform/resolvers/zod` + `@/lib/validations/*` |
+| B9 | `any` type annotations | Explicit typed interfaces | — |
+| B10 | Custom modal `<div>` overlays | `<Dialog>` | `@/components/ui/dialog` |
+
+---
+
+## 2 — COLOR CLASS BAN (Design Tokens Only)
+
+**BANNED:** Any Tailwind color utility that hardcodes a specific color scale.
+
+Examples of BANNED classes (non-exhaustive):
+```
+bg-blue-50  bg-blue-100  bg-blue-600  bg-green-100  bg-green-600
+bg-red-50   bg-red-500   bg-yellow-100  bg-gray-100  bg-slate-200
+text-blue-600  text-green-600  text-red-500  text-yellow-700
+text-gray-500  text-slate-600  text-zinc-400  text-emerald-600
+border-blue-200  border-red-300  ring-green-500
+```
+
+**ALLOWED:** Only semantic design token classes:
+```
+bg-background  bg-card  bg-muted  bg-primary  bg-secondary  bg-accent
+bg-destructive  bg-success/15  bg-warning/15  bg-info/15
+text-foreground  text-muted-foreground  text-primary  text-primary-foreground
+text-secondary-foreground  text-accent-foreground  text-destructive
+text-success  text-warning  text-warning-foreground  text-info
+border-border  border-input  ring-ring
+bg-sidebar  text-sidebar-foreground  (any --sidebar-* token)
+bg-fee-paid/15  text-fee-paid  (any --fee-* token)
+```
+
+**Rule:** If the class contains a color name followed by a number (e.g. `blue-600`,
+`green-100`, `slate-50`), it is BANNED. Replace it with the closest semantic token.
+
+---
+
+## 3 — REQUIRED IMPORTS (Every Admin Page)
+
+Every admin page MUST have at minimum:
+
+```tsx
+import { api } from "@/lib/api-client";
+import { toast } from "sonner";
+import { SxPageHeader, SxButton, SxDataTable, SxStatusBadge } from "@/components/sx";
+```
+
+If the page has a form, it MUST also include:
+
+```tsx
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { SxFormSection } from "@/components/sx";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+```
+
+---
+
+## 4 — PAGE STRUCTURE (Golden Reference)
+
+The canonical reference implementation is:
+**`web/app/admin/organizations/page.tsx`**
+
+Every admin page MUST follow this structure in order:
+
+1. `"use client"` directive
+2. Import block (React → resolvers → sonner → lucide → api-client → validations → Sx → shadcn)
+3. TypeScript interfaces (no `any`, no `unknown` in public types)
+4. Column definitions as `SxColumn<T>[]` (outside the component)
+5. Helper functions (outside the component)
+6. Default export page component containing:
+   - State hooks
+   - `useCallback` data-fetching with `api.get<T>()`
+   - `useForm<T>({ resolver: zodResolver(schema) })`
+   - Submit handler using `api.post<T>()` with field-error mapping
+   - Dialog open/close handler that calls `reset()`
+   - JSX: `SxPageHeader` → `SxDataTable` → `Dialog` with `SxFormSection` groups
+
+---
+
+## 5 — MANDATORY SELF-AUDIT (Before Every Response)
+
+**You MUST run this checklist mentally before completing any edit to an admin page.
+If ANY check fails, go back and fix it. Do not deliver violated code.**
+
+```
+[ ] No raw <table>, <button>, <input>, <select>, <option> tags
+[ ] No raw fetch() calls — only api.get/post/put/patch/delete
+[ ] No alert() / confirm() / prompt() — only toast from sonner
+[ ] No hardcoded color classes (bg-blue-*, text-red-*, etc.)
+[ ] No `any` type annotations
+[ ] No inline `rules={{ }}` validation — using zodResolver
+[ ] Forms use SxFormSection for field grouping
+[ ] SxPageHeader present with title + subtitle
+[ ] SxDataTable used for all tabular data
+[ ] SxStatusBadge used for all status/type display
+[ ] SxButton used for all interactive buttons
+[ ] All Dialog modals use shadcn Dialog components
+[ ] All imports present (api, toast, Sx components)
+```
+
+**If you cannot satisfy a check, explain why in your response — do not silently skip it.**

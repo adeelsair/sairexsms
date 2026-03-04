@@ -1,0 +1,150 @@
+---
+description: API client enforcement and error handling — hard bans on raw fetch
+globs: web/app/**/*.tsx, web/app/**/*.ts, web/lib/**/*.ts
+alwaysApply: true
+---
+
+# API Client & Error Handling — ENFORCED
+
+> **SEVERITY: BLOCKING**
+> Every rule below is a hard constraint. Violations MUST be fixed before
+> completing your response. No exceptions.
+
+---
+
+## 1 — HARD BAN: No Raw `fetch()`
+
+**BANNED in all client-side code:**
+```tsx
+// VIOLATION — will be rejected
+const res = await fetch("/api/organizations");
+const data = await res.json();
+
+// VIOLATION — will be rejected
+fetch("/api/users", { method: "POST", body: JSON.stringify(data) });
+
+// VIOLATION — will be rejected
+new Request("/api/endpoint");
+```
+
+**REQUIRED replacement:**
+```tsx
+import { api } from "@/lib/api-client";
+
+// GET
+const result = await api.get<Organization[]>("/api/organizations");
+
+// POST
+const result = await api.post<Organization>("/api/organizations", data);
+
+// PUT
+const result = await api.put<Organization>(`/api/organizations/${id}`, data);
+
+// PATCH
+const result = await api.patch<Organization>(`/api/organizations/${id}`, data);
+
+// DELETE
+const result = await api.delete<void>(`/api/organizations/${id}`);
+```
+
+**Exception:** Server-side API route handlers (`web/app/api/**`) may use raw
+database calls via Prisma. The `fetch()` ban applies only to client components
+and client-side code.
+
+---
+
+## 2 — HARD BAN: No `alert()` / `confirm()` / `prompt()`
+
+**BANNED everywhere in `web/app/**`:**
+```tsx
+// VIOLATION
+alert("Something went wrong");
+window.alert("Error");
+confirm("Are you sure?");
+prompt("Enter value");
+```
+
+**REQUIRED replacement:**
+```tsx
+import { toast } from "sonner";
+
+// Success
+toast.success("Organization created successfully");
+
+// Error
+toast.error("Failed to load organizations");
+
+// Warning / info
+toast.warning("This action cannot be undone");
+toast.info("Processing your request...");
+```
+
+For confirmations, use a shadcn `AlertDialog` — never `window.confirm()`.
+
+---
+
+## 3 — MANDATORY: Discriminated Union Error Handling
+
+Every API call MUST handle the result using the discriminated union pattern:
+
+```tsx
+const result = await api.post<Organization>("/api/organizations", data);
+
+if (result.ok) {
+  // Success path — result.data is typed as Organization
+  toast.success("Created successfully");
+  reset();
+  refetch();
+} else if (result.fieldErrors) {
+  // Server-side Zod validation errors — map to form fields
+  for (const [field, messages] of Object.entries(result.fieldErrors)) {
+    form.setError(field as keyof FormInput, { message: messages[0] });
+  }
+  toast.error("Please fix the validation errors");
+} else {
+  // General error — show toast
+  toast.error(result.error);
+}
+```
+
+**BANNED shortcuts:**
+```tsx
+// VIOLATION — no error handling
+const result = await api.get<T>("/api/data");
+setData(result.data); // result might be an error!
+
+// VIOLATION — swallowing errors
+try { await api.post(...) } catch(e) { /* nothing */ }
+```
+
+---
+
+## 4 — MANDATORY: Typed API Calls
+
+Every `api.get()` / `api.post()` / etc. MUST include a type parameter:
+
+```tsx
+// GOOD
+const result = await api.get<Organization[]>("/api/organizations");
+const result = await api.post<Organization>("/api/organizations", data);
+
+// BANNED — untyped
+const result = await api.get("/api/organizations");
+const result = await api.post("/api/organizations", data);
+```
+
+---
+
+## 5 — SELF-AUDIT CHECKLIST
+
+**Before completing any edit to client-side code, verify:**
+
+```
+[ ] No raw fetch() / new Request() — only api.get/post/put/patch/delete
+[ ] No alert() / confirm() / prompt() — only toast from sonner
+[ ] Every api call has a type parameter: api.get<T>(...)
+[ ] Every api result uses if (result.ok) / else pattern
+[ ] Field errors mapped back via form.setError() when applicable
+[ ] Success actions show toast.success()
+[ ] Error actions show toast.error()
+```

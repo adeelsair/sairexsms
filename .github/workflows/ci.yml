@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-quality:
+    name: Web Quality Gates
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    env:
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+      # Set this repository variable to "true" when CI should run DB-backed finance checks.
+      RUN_FINANCE_TESTS: ${{ vars.RUN_FINANCE_TESTS || 'false' }}
+      DATABASE_URL_TEST: ${{ secrets.DATABASE_URL_TEST }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Prepare finance test env
+        if: env.RUN_FINANCE_TESTS == 'true' && env.DATABASE_URL_TEST != ''
+        run: |
+          cat <<'EOF' > .env.test
+          DATABASE_URL=${{ secrets.DATABASE_URL_TEST }}
+          EOF
+
+      - name: Finance migration smoke
+        if: env.RUN_FINANCE_TESTS == 'true' && env.DATABASE_URL_TEST != ''
+        run: npm run test:finance:migrate
+
+      - name: Finance reconciliation test
+        if: env.RUN_FINANCE_TESTS == 'true' && env.DATABASE_URL_TEST != ''
+        run: npm run test:finance

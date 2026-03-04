@@ -1,0 +1,46 @@
+﻿
+=== Snapshot 1 @ 2026-03-03T15:01:20.6339125+05:00 ===
+sairex_app 0.02% 211.9MiB / 5.662GiB
+sairex_worker 0.41% 178.5MiB / 5.662GiB
+sairex_pgadmin 0.05% 62.86MiB / 5.662GiB
+sairex_redis_commander 0.00% 35.91MiB / 5.662GiB
+sairex_db 0.01% 38.62MiB / 5.662GiB
+sairex_redis 0.50% 8.039MiB / 5.662GiB
+sairex_mailhog 0.00% 2.98MiB / 5.662GiB
+
+=== Snapshot 2 @ 2026-03-03T15:01:25.2933259+05:00 ===
+sairex_app 0.00% 211.9MiB / 5.662GiB
+sairex_worker 1.33% 178.8MiB / 5.662GiB
+sairex_pgadmin 0.06% 62.86MiB / 5.662GiB
+sairex_redis_commander 0.00% 35.91MiB / 5.662GiB
+sairex_db 0.00% 38.62MiB / 5.662GiB
+sairex_redis 0.86% 8.039MiB / 5.662GiB
+sairex_mailhog 0.00% 2.98MiB / 5.662GiB
+
+=== Snapshot 3 @ 2026-03-03T15:01:29.6162480+05:00 ===
+sairex_app 0.00% 211.9MiB / 5.662GiB
+sairex_worker 0.63% 178.8MiB / 5.662GiB
+sairex_pgadmin 0.03% 62.86MiB / 5.662GiB
+sairex_redis_commander 0.00% 35.91MiB / 5.662GiB
+sairex_db 0.00% 38.62MiB / 5.662GiB
+sairex_redis 0.72% 8.043MiB / 5.662GiB
+sairex_mailhog 0.00% 2.98MiB / 5.662GiB
+
+=== Snapshot 4 @ 2026-03-03T15:01:33.8985617+05:00 ===
+sairex_app 0.00% 211.9MiB / 5.662GiB
+sairex_worker 0.44% 178.9MiB / 5.662GiB
+sairex_pgadmin 0.04% 62.86MiB / 5.662GiB
+sairex_redis_commander 0.00% 35.91MiB / 5.662GiB
+sairex_db 0.00% 38.62MiB / 5.662GiB
+sairex_redis 0.51% 8.039MiB / 5.662GiB
+sairex_mailhog 0.00% 2.98MiB / 5.662GiB
+
+=== Snapshot 5 @ 2026-03-03T15:01:38.1308636+05:00 ===
+sairex_app 0.00% 211.9MiB / 5.662GiB
+sairex_worker 0.37% 178.8MiB / 5.662GiB
+sairex_pgadmin 0.06% 62.86MiB / 5.662GiB
+sairex_redis_commander 0.00% 35.91MiB / 5.662GiB
+sairex_db 0.00% 38.62MiB / 5.662GiB
+sairex_redis 0.43% 8.039MiB / 5.662GiB
+sairex_mailhog 0.00% 2.98MiB / 5.662GiB
+

@@ -1,0 +1,3 @@
+ALTER TABLE "RevenueCycle"
+ADD COLUMN "closingDayUsed" INTEGER NOT NULL DEFAULT 10;
+

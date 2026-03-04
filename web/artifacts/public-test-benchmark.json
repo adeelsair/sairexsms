@@ -1,0 +1,18 @@
+{
+  "route": "/public-test",
+  "warmupStatus": 200,
+  "concurrent100": {
+    "requests": 100,
+    "elapsedMs": 30124,
+    "avgMs": 26521,
+    "p95Ms": 30092,
+    "p99Ms": 30094,
+    "ok": 12,
+    "failed": 88,
+    "successRate": 12,
+    "statuses": {
+      "200": 12,
+      "599": 88
+    }
+  }
+}
