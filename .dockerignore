@@ -11,3 +11,5 @@ backups
 venv
 .cursor
 web/.next
+
+infra/server/volumes
