@@ -1,0 +1,2 @@
+-- Placeholder migration file restored to satisfy Prisma migrate deploy.
+-- SMS engine schema changes will be added in subsequent migration steps.

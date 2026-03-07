@@ -1,17 +1,19 @@
 import { Worker } from "bullmq"
 import IORedis from "ioredis"
-import { PrismaClient, SmsStatus } from "@prisma/client"
+import { PrismaClient, SmsStatus } from "../../../../../../web/lib/generated/prisma"
 import { SmsService } from "../sms/sms.service"
 import { SmsQueueJob } from "../sms/sms.types"
 import { checkSmsRateLimit } from "./sms.rate-limit"
+import { getRedisConnectionOptions } from "./redis.config"
 
 const queueName = process.env.SMS_QUEUE_NAME ?? "sms_queue"
 const prisma = new PrismaClient()
 const smsService = new SmsService()
+const redisOptions = getRedisConnectionOptions()
 
 const connection = new IORedis({
-  host: process.env.REDIS_HOST,
-  port: Number(process.env.REDIS_PORT),
+  host: redisOptions.host,
+  port: redisOptions.port,
   maxRetriesPerRequest: null,
 })
 const workerConcurrency = Number(process.env.SMS_WORKER_CONCURRENCY ?? "5")

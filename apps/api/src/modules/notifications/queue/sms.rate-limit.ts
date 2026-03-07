@@ -1,8 +1,11 @@
 import IORedis from "ioredis"
+import { getRedisConnectionOptions } from "./redis.config"
+
+const redisOptions = getRedisConnectionOptions()
 
 const redis = new IORedis({
-  host: process.env.REDIS_HOST,
-  port: Number(process.env.REDIS_PORT),
+  host: redisOptions.host,
+  port: redisOptions.port,
   maxRetriesPerRequest: null,
 })
 

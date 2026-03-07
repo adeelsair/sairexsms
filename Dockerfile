@@ -14,7 +14,7 @@ FROM base AS builder
 COPY --from=deps /app/web/node_modules /app/web/node_modules
 COPY . .
 WORKDIR /app
-RUN /app/web/node_modules/.bin/prisma generate --schema /app/prisma/schema.prisma
+RUN /app/web/node_modules/.bin/prisma generate --schema /app/prisma/schema.prisma --generator jsClient
 WORKDIR /app/web
 ENV DOCKER_BUILD=1
 RUN npx next build
@@ -28,6 +28,8 @@ ENV NODE_ENV=production
 
 COPY --from=builder /app/web ./
 COPY --from=builder /app/prisma ../prisma
+COPY --from=builder /app/apps ../apps
+RUN ln -s /app/web/node_modules /app/node_modules
 
 EXPOSE 3000
 

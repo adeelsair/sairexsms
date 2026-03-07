@@ -74,12 +74,48 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  sms_worker:
+    profiles: ["prod"]
+    image: ${SAIREX_IMAGE:-sairexsms-ops:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ops-runner
+    container_name: sairex_sms_worker
+    command: sh -lc "cd /app && /app/web/node_modules/.bin/tsx apps/api/src/modules/notifications/queue/sms.worker.ts"
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+
   worker_dev:
     profiles: ["dev"]
     image: sairexsms-ops:latest
     container_name: sairex_worker_dev
     working_dir: /app/web
     command: npm run worker:dev
+    volumes:
+      - .:/app
+      - /app/web/node_modules
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
+
+  sms_worker_dev:
+    profiles: ["dev"]
+    image: sairexsms-ops:latest
+    container_name: sairex_sms_worker_dev
+    working_dir: /app
+    command: /app/web/node_modules/.bin/tsx apps/api/src/modules/notifications/queue/sms.worker.ts
     volumes:
       - .:/app
       - /app/web/node_modules

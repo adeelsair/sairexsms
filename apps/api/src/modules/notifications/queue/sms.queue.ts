@@ -1,11 +1,13 @@
 import { Queue } from "bullmq"
 import IORedis from "ioredis"
+import { getRedisConnectionOptions } from "./redis.config"
 
 const queueName = process.env.SMS_QUEUE_NAME ?? "sms_queue"
+const redisOptions = getRedisConnectionOptions()
 
 const connection = new IORedis({
-  host: process.env.REDIS_HOST,
-  port: Number(process.env.REDIS_PORT),
+  host: redisOptions.host,
+  port: redisOptions.port,
   maxRetriesPerRequest: null,
 })
 

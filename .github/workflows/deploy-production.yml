@@ -1,0 +1,98 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy (example: sha-abc123, latest)"
+        required: true
+        default: "latest"
+      run_migrations:
+        description: "Run Prisma migrations during deploy"
+        type: boolean
+        required: true
+        default: true
+      create_db_backup:
+        description: "Create PostgreSQL backup before deploy"
+        type: boolean
+        required: true
+        default: true
+  workflow_run:
+    workflows: ["Docker"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Safe Deploy
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main'
+      )
+    environment:
+      name: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve image reference
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            image_tag="${{ inputs.image_tag }}"
+            run_migrations="${{ inputs.run_migrations }}"
+            create_db_backup="${{ inputs.create_db_backup }}"
+          else
+            image_tag="sha-$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)"
+            run_migrations="true"
+            create_db_backup="true"
+          fi
+
+          echo "image_ref=ghcr.io/${owner}/sairexsms:${image_tag}" >> "${GITHUB_OUTPUT}"
+          echo "run_migrations=${run_migrations}" >> "${GITHUB_OUTPUT}"
+          echo "create_db_backup=${create_db_backup}" >> "${GITHUB_OUTPUT}"
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          script_stop: true
+          command_timeout: 60m
+          script: |
+            set -euo pipefail
+            APP_DIR="${{ secrets.PROD_APP_DIR }}"
+            if [ -z "${APP_DIR}" ]; then
+              echo "Secret PROD_APP_DIR is required."
+              exit 1
+            fi
+
+            cd "${APP_DIR}"
+            git fetch origin main
+            git checkout main
+            git pull --ff-only origin main
+            chmod +x infra/server/deploy-safe.sh
+
+            IMAGE_REF="${{ steps.image.outputs.image_ref }}" \
+            RUN_MIGRATIONS="${{ steps.image.outputs.run_migrations }}" \
+            CREATE_DB_BACKUP="${{ steps.image.outputs.create_db_backup }}" \
+            APP_DIR="${APP_DIR}" \
+            COMPOSE_FILE_PATH="infra/server/docker-compose.prod.yml" \
+            ENV_FILE_PATH="infra/server/server.env.live" \
+            infra/server/deploy-safe.sh

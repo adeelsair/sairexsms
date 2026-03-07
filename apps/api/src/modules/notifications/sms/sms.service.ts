@@ -2,7 +2,7 @@ import { TwilioProvider } from "../providers/twilio.provider"
 import { ProviderRouter } from "../providers/provider.router"
 import { smsQueue } from "../queue/sms.queue"
 import { SmsQueueJob, SmsSendParams, SmsSendResult } from "./sms.types"
-import { PrismaClient, SmsStatus } from "@prisma/client"
+import { PrismaClient, SmsStatus } from "../../../../../../web/lib/generated/prisma"
 
 export class SmsService {
   // Future order: Jazz -> Zong -> Telenor -> Twilio

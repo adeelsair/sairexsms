@@ -98,6 +98,34 @@ services:
           cpus: "1.00"
           memory: 1G
 
+  sms_worker:
+    image: ${SAIREX_IMAGE:-ghcr.io/YOUR_GITHUB_USERNAME/sairexsms-ops:latest}
+    container_name: sairex_sms_worker
+    command: sh -lc "cd /app && /app/web/node_modules/.bin/tsx apps/api/src/modules/notifications/queue/sms.worker.ts"
+    restart: always
+    env_file:
+      - ${SAIREX_ENV_FILE:-.env}
+    depends_on:
+      redis:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1G
+
   db:
     image: postgres:15
     container_name: sairex_db
