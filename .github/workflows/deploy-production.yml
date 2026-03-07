@@ -63,7 +63,7 @@ jobs:
             create_db_backup="true"
           fi
 
-          echo "image_ref=ghcr.io/${owner}/sairexsms:${image_tag}" >> "${GITHUB_OUTPUT}"
+          echo "image_ref=ghcr.io/${owner}/sairexsms-ops:${image_tag}" >> "${GITHUB_OUTPUT}"
           echo "run_migrations=${run_migrations}" >> "${GITHUB_OUTPUT}"
           echo "create_db_backup=${create_db_backup}" >> "${GITHUB_OUTPUT}"
 

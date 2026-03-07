@@ -62,7 +62,7 @@ services:
   migrate:
     image: ${SAIREX_IMAGE:-ghcr.io/YOUR_GITHUB_USERNAME/sairexsms-ops:latest}
     container_name: sairex_migrate
-    command: sh -lc "npx prisma migrate deploy --schema ../prisma/schema.prisma"
+    command: sh -lc "npx prisma@5.22.0 migrate deploy --schema /app/web/lib/generated/prisma/schema.prisma"
     restart: "no"
     env_file:
       - ${SAIREX_ENV_FILE:-.env}
