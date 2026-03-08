@@ -1,4 +1,7 @@
 import { brand } from "@/lib/config/theme";
+import Image from "next/image";
+import Link from "next/link";
+import { getAdminChromeColors, SIDEBAR_MID_COLOR } from "@/lib/theme/chrome-theme";
 
 /**
  * Shared layout for all authentication pages.
@@ -9,31 +12,52 @@ export default function AuthLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const { topBarBackgroundColor, topBarTextColor, bottomBarBackgroundColor, bottomBarTextColor } =
+    getAdminChromeColors();
+
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 py-12">
-      {/* Background glow */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -right-40 -top-40 h-80 w-80 rounded-full bg-primary/10 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-primary/5 blur-3xl" />
-      </div>
-
-      <div className="relative mx-4 w-full max-w-md">
-        {/* Brand header */}
-        <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold tracking-tight text-white">
-            SAIREX <span className="text-primary">SMS</span>
-          </h1>
-          <p className="mt-2 text-sm text-slate-400">{brand.tagline}</p>
+    <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
+      <header
+        className="border-b px-4 py-3"
+        style={{
+          backgroundColor: topBarBackgroundColor,
+          borderColor: SIDEBAR_MID_COLOR,
+          color: topBarTextColor,
+        }}
+      >
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">
+          <Link href="/" aria-label="Go to SairexSMS landing page">
+            <Image
+              src="/sairex-logo.png"
+              alt="SairexSMS"
+              width={224}
+              height={58}
+              className="h-10 w-auto rounded-md object-contain sm:h-11 md:h-14"
+              priority
+            />
+          </Link>
+          <p className="hidden text-xs font-medium opacity-90 sm:block">{brand.tagline}</p>
         </div>
+      </header>
 
-        {/* Page content (cards) */}
-        {children}
-
-        {/* Footer */}
-        <p className="mt-6 text-center text-xs text-slate-500">
-          Powered by {brand.company}
-        </p>
+      <div className="relative flex flex-1 overflow-y-auto overflow-x-hidden px-4 py-8">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -right-32 -top-28 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
+          <div className="absolute -left-28 bottom-0 h-72 w-72 rounded-full bg-primary/5 blur-3xl" />
+        </div>
+        <div className="relative mx-auto my-auto w-full max-w-md">{children}</div>
       </div>
+
+      <footer
+        className="border-t px-4 py-2 text-center text-xs"
+        style={{
+          backgroundColor: bottomBarBackgroundColor,
+          borderColor: SIDEBAR_MID_COLOR,
+          color: bottomBarTextColor,
+        }}
+      >
+        Powered by {brand.company}
+      </footer>
     </div>
   );
 }

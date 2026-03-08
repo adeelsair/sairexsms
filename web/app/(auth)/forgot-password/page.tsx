@@ -3,8 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Loader2, Mail } from "lucide-react";
+import { api } from "@/lib/api-client";
+import { Input } from "@/components/ui/input";
+import { SxButton } from "@/components/sx";
 
 export default function ForgotPasswordPage() {
+  const authInputClass = "bg-background text-foreground placeholder:text-foreground/70";
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -15,37 +19,30 @@ export default function ForgotPasswordPage() {
     setError("");
     setLoading(true);
 
-    try {
-      const res = await fetch("/api/auth/forgot-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
+    const result = await api.post<{ message: string }>("/api/auth/forgot-password", {
+      email,
+    });
 
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || "Something went wrong.");
-      } else {
-        setSent(true);
-      }
-    } catch {
-      setError("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
+    if (!result.ok) {
+      setError(result.error || "Something went wrong.");
+    } else {
+      setSent(true);
     }
+
+    setLoading(false);
   };
 
   return (
-    <div className="rounded-lg border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl">
+    <div className="rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
       {sent ? (
         <div className="text-center">
           <Mail className="mx-auto mb-4 h-10 w-10 text-primary" />
-          <h2 className="mb-2 text-xl font-semibold text-white">
+          <h2 className="mb-2 text-xl font-semibold text-foreground">
             Check your email
           </h2>
-          <p className="mb-6 text-sm text-slate-400">
+          <p className="mb-6 text-sm text-muted-foreground">
             If an account with{" "}
-            <strong className="text-slate-300">{email}</strong> exists,
+            <strong className="text-foreground">{email}</strong> exists,
             we&apos;ve sent a password reset link. It expires in 1 hour.
           </p>
           <Link
@@ -57,16 +54,16 @@ export default function ForgotPasswordPage() {
         </div>
       ) : (
         <>
-          <h2 className="mb-1 text-xl font-semibold text-white">
+          <h2 className="mb-1 text-xl font-semibold text-foreground">
             Forgot your password?
           </h2>
-          <p className="mb-6 text-sm text-slate-400">
-            Enter your email and we&apos;ll send you a reset link.
+          <p className="mb-6 text-sm text-muted-foreground">
+            Enter your account email and we&apos;ll send a reset link.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-red-300">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                 {error}
               </div>
             )}
@@ -74,11 +71,11 @@ export default function ForgotPasswordPage() {
             <div>
               <label
                 htmlFor="email"
-                className="mb-1.5 block text-sm font-medium text-slate-300"
+                className="mb-1.5 block text-sm font-medium text-foreground"
               >
                 Email address
               </label>
-              <input
+              <Input
                 id="email"
                 type="email"
                 value={email}
@@ -86,14 +83,15 @@ export default function ForgotPasswordPage() {
                 placeholder="your@email.com"
                 required
                 autoFocus
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-slate-500 transition-all focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                className={authInputClass}
               />
             </div>
 
-            <button
+            <SxButton
               type="submit"
               disabled={loading}
-              className="w-full rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              sxVariant="primary"
+              className="w-full"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -103,7 +101,7 @@ export default function ForgotPasswordPage() {
               ) : (
                 "Send reset link"
               )}
-            </button>
+            </SxButton>
           </form>
 
           <div className="mt-6 text-center">
@@ -111,7 +109,7 @@ export default function ForgotPasswordPage() {
               href="/login"
               className="text-sm font-medium text-primary hover:text-primary/80"
             >
-              Back to login
+              Back to sign in
             </Link>
           </div>
         </>

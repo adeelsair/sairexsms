@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { hashPasswordResetToken } from "@/lib/auth/password-reset-token";
 import { applyRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import {
+  PASSWORD_POLICY_ERROR,
+  isPasswordPolicyCompliant,
+} from "@/lib/auth/password-policy";
 
 // POST: Reset password using a token (unauthenticated)
 export async function POST(request: Request) {
@@ -19,9 +23,9 @@ export async function POST(request: Request) {
       );
     }
 
-    if (newPassword.length < 8) {
+    if (!isPasswordPolicyCompliant(newPassword)) {
       return NextResponse.json(
-        { error: "Password must be at least 8 characters" },
+        { error: PASSWORD_POLICY_ERROR },
         { status: 400 }
       );
     }

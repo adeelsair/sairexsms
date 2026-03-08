@@ -6,10 +6,19 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Loader2, AlertTriangle, CheckCircle2, Mail } from "lucide-react";
+import {
+  Loader2,
+  AlertTriangle,
+  CheckCircle2,
+  Mail,
+  Eye,
+  EyeOff,
+  Info,
+} from "lucide-react";
 
 import { api } from "@/lib/api-client";
 import { signupSchema, type SignupInput } from "@/lib/validations/signup";
+import { PASSWORD_RULE_TEXT } from "@/lib/auth/password-policy";
 
 import { SxButton, SxStatusBadge } from "@/components/sx";
 import {
@@ -21,6 +30,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 /* ══════════════════════════════════════════════════════════════
    Types
@@ -47,6 +62,7 @@ function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const inviteToken = searchParams.get("invite") || "";
+  const authInputClass = "bg-background text-foreground placeholder:text-foreground/70";
 
   const isInvited = !!inviteToken;
 
@@ -56,6 +72,8 @@ function SignupForm() {
   const [inviteError, setInviteError] = useState("");
   const [emailSent, setEmailSent] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   /* ── Invite validation ──────────────────────────────────── */
 
@@ -147,7 +165,7 @@ function SignupForm() {
 
   if (isInvited && inviteError) {
     return (
-      <div className="rounded-lg border border-border bg-card/80 p-8 text-center shadow-2xl backdrop-blur-xl">
+      <div className="rounded-xl border border-border bg-card p-6 text-center shadow-sm sm:p-8">
         <AlertTriangle className="mx-auto mb-4 h-10 w-10 text-warning" />
         <h2 className="mb-2 text-xl font-semibold text-foreground">
           Invalid Invite
@@ -167,7 +185,7 @@ function SignupForm() {
 
   if (isInvited && !inviteInfo && !inviteError) {
     return (
-      <div className="rounded-lg border border-border bg-card/80 p-8 text-center text-muted-foreground shadow-2xl backdrop-blur-xl">
+      <div className="rounded-xl border border-border bg-card p-6 text-center text-muted-foreground shadow-sm sm:p-8">
         <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin" />
         Validating invite...
       </div>
@@ -178,7 +196,7 @@ function SignupForm() {
 
   if (emailSent) {
     return (
-      <div className="rounded-lg border border-border bg-card/80 p-8 text-center shadow-2xl backdrop-blur-xl">
+      <div className="rounded-xl border border-border bg-card p-6 text-center shadow-sm sm:p-8">
         <Mail className="mx-auto mb-4 h-10 w-10 text-primary" />
         <h2 className="mb-2 text-xl font-semibold text-foreground">
           Check your email
@@ -204,9 +222,9 @@ function SignupForm() {
   /* ── Render ─────────────────────────────────────────────── */
 
   return (
-    <div className="rounded-lg border border-border bg-card/80 p-8 shadow-2xl backdrop-blur-xl">
+    <div className="rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
       <h2 className="mb-1 text-xl font-semibold text-foreground">
-        {isInvited ? "Join your organization" : "Create your Account"}
+        {isInvited ? "Join your organization" : "Create your account"}
       </h2>
       <p className="mb-6 text-sm text-muted-foreground">
         {isInvited ? (
@@ -218,7 +236,7 @@ function SignupForm() {
             </SxStatusBadge>
           </>
         ) : (
-          "Register to get started with SAIREX SMS"
+          "Create your account to start managing your school with SAIREX SMS."
         )}
       </p>
 
@@ -232,7 +250,7 @@ function SignupForm() {
               <FormItem>
                 <FormLabel>Full Name</FormLabel>
                 <FormControl>
-                  <Input placeholder="Your full name" {...field} />
+                  <Input placeholder="Your full name" className={authInputClass} {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -252,6 +270,7 @@ function SignupForm() {
                     placeholder="you@example.com"
                     readOnly={isInvited}
                     disabled={isInvited}
+                    className={authInputClass}
                     {...field}
                   />
                 </FormControl>
@@ -271,13 +290,53 @@ function SignupForm() {
             name="password"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Password</FormLabel>
+                <div className="flex items-center gap-1.5">
+                  <FormLabel className="mb-0">Password</FormLabel>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label="Show password setup rules"
+                          className="inline-flex items-center rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <Info className="h-4 w-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs p-3 text-xs">
+                        <p className="mb-1 font-semibold">Password rules:</p>
+                        <ul className="list-disc space-y-0.5 pl-4">
+                          <li>{PASSWORD_RULE_TEXT.minLength}</li>
+                          <li>{PASSWORD_RULE_TEXT.uppercase}</li>
+                          <li>{PASSWORD_RULE_TEXT.lowercase}</li>
+                          <li>{PASSWORD_RULE_TEXT.number}</li>
+                          <li>{PASSWORD_RULE_TEXT.symbol}</li>
+                        </ul>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
                 <FormControl>
-                  <Input
-                    type="password"
-                    placeholder="Minimum 8 characters"
-                    {...field}
-                  />
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Minimum 8 characters"
+                      className={`${authInputClass} pr-10`}
+                      {...field}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -292,11 +351,26 @@ function SignupForm() {
               <FormItem>
                 <FormLabel>Confirm Password</FormLabel>
                 <FormControl>
-                  <Input
-                    type="password"
-                    placeholder="Repeat your password"
-                    {...field}
-                  />
+                  <div className="relative">
+                    <Input
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="Repeat your password"
+                      className={`${authInputClass} pr-10`}
+                      {...field}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword((prev) => !prev)}
+                      aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -317,7 +391,7 @@ function SignupForm() {
 
       {!isInvited && (
         <p className="mt-3 text-center text-xs text-muted-foreground">
-          You&apos;ll receive a verification email to confirm your address
+          We&apos;ll send a verification email to confirm your address.
         </p>
       )}
 
@@ -344,7 +418,7 @@ export default function SignupPage() {
   return (
     <Suspense
       fallback={
-        <div className="rounded-lg border border-border bg-card/80 p-8 text-center text-muted-foreground shadow-2xl backdrop-blur-xl">
+        <div className="rounded-xl border border-border bg-card p-6 text-center text-muted-foreground shadow-sm sm:p-8">
           <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin" />
           Loading...
         </div>

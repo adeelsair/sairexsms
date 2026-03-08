@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_POLICY_ERROR,
+  isPasswordPolicyCompliant,
+} from "@/lib/auth/password-policy";
 
 // ─── Register Schema ─────────────────────────────────────────────────────────
 //
@@ -24,8 +30,11 @@ export const signupSchema = z
 
     password: z
       .string()
-      .min(8, "Password must be at least 8 characters")
-      .max(72, "Password must not exceed 72 characters"),
+      .min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`)
+      .max(PASSWORD_MAX_LENGTH, `Password must not exceed ${PASSWORD_MAX_LENGTH} characters`)
+      .refine((value) => isPasswordPolicyCompliant(value), {
+        message: PASSWORD_POLICY_ERROR,
+      }),
 
     confirmPassword: z
       .string()

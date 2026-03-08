@@ -3,7 +3,7 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Loader2, AlertTriangle, CheckCircle2, Mail } from "lucide-react";
+import { Loader2, AlertTriangle, Mail } from "lucide-react";
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
@@ -11,7 +11,7 @@ function VerifyEmailContent() {
 
   if (error) {
     return (
-      <div className="rounded-lg border border-border bg-card/80 p-8 text-center shadow-2xl backdrop-blur-xl">
+      <div className="rounded-xl border border-border bg-card p-6 text-center shadow-sm sm:p-8">
         <AlertTriangle className="mx-auto mb-4 h-10 w-10 text-warning" />
         <h2 className="mb-2 text-xl font-semibold text-foreground">
           Verification Failed
@@ -28,14 +28,14 @@ function VerifyEmailContent() {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card/80 p-8 text-center shadow-2xl backdrop-blur-xl">
+    <div className="rounded-xl border border-border bg-card p-6 text-center shadow-sm sm:p-8">
       <Mail className="mx-auto mb-4 h-10 w-10 text-primary" />
       <h2 className="mb-2 text-xl font-semibold text-foreground">
         Verify your email
       </h2>
       <p className="mb-6 text-sm text-muted-foreground">
-        We sent a verification link to your email address.
-        Please check your inbox (and spam folder) and click the link to continue.
+        We sent a verification link to your email address. Please check your inbox (and spam
+        folder) and click the link to continue.
       </p>
       <p className="mb-6 text-xs text-muted-foreground">
         The link expires in 24 hours.
@@ -45,7 +45,7 @@ function VerifyEmailContent() {
           href="/login"
           className="block text-sm font-medium text-primary hover:text-primary/80"
         >
-          Already verified? Sign in
+          Already verified? Go to sign in
         </Link>
         <Link
           href="/signup"
@@ -62,7 +62,7 @@ export default function VerifyEmailPage() {
   return (
     <Suspense
       fallback={
-        <div className="rounded-lg border border-border bg-card/80 p-8 text-center text-muted-foreground shadow-2xl backdrop-blur-xl">
+        <div className="rounded-xl border border-border bg-card p-6 text-center text-muted-foreground shadow-sm sm:p-8">
           <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin" />
           Loading...
         </div>

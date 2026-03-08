@@ -3,13 +3,17 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { api } from "@/lib/api-client";
+import { Input } from "@/components/ui/input";
+import { SxButton } from "@/components/sx";
 
 export default function LoginPage() {
   const router = useRouter();
+  const authInputClass = "bg-background text-foreground placeholder:text-foreground/70";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -37,15 +41,15 @@ export default function LoginPage() {
 
   return (
     <>
-      <div className="rounded-lg border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl">
-        <h2 className="mb-1 text-xl font-semibold text-white">Welcome back</h2>
-        <p className="mb-6 text-sm text-slate-400">
-          Sign in to your admin console
+      <div className="rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
+        <h2 className="mb-1 text-xl font-semibold text-foreground">Welcome back</h2>
+        <p className="mb-6 text-sm text-muted-foreground">
+          Sign in to continue to your school admin dashboard.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {error && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-red-300">
+            <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {error}
             </div>
           )}
@@ -53,44 +57,59 @@ export default function LoginPage() {
           <div>
             <label
               htmlFor="email"
-              className="mb-1.5 block text-sm font-medium text-slate-300"
+              className="mb-1.5 block text-sm font-medium text-foreground"
             >
               Email address
             </label>
-            <input
+            <Input
               id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@sairex-sms.com"
+              placeholder="you@example.com"
               required
               autoFocus
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-slate-500 transition-all focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className={authInputClass}
             />
           </div>
 
           <div>
             <label
               htmlFor="password"
-              className="mb-1.5 block text-sm font-medium text-slate-300"
+              className="mb-1.5 block text-sm font-medium text-foreground"
             >
               Password
             </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              required
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-slate-500 transition-all focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                required
+                className={`${authInputClass} pr-10`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
 
-          <button
+          <SxButton
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+            sxVariant="primary"
+            className="w-full"
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
@@ -100,7 +119,7 @@ export default function LoginPage() {
             ) : (
               "Sign in"
             )}
-          </button>
+          </SxButton>
         </form>
 
         <div className="mt-5 space-y-2 text-center">
@@ -113,14 +132,14 @@ export default function LoginPage() {
             </Link>
           </div>
           <div>
-            <span className="text-sm text-slate-500">
+            <span className="text-sm text-muted-foreground">
               Don&apos;t have an account?{" "}
             </span>
             <Link
               href="/signup"
               className="text-sm font-medium text-primary hover:text-primary/80"
             >
-              Sign up
+              Create account
             </Link>
           </div>
         </div>
