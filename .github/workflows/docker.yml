@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  build-and-push:
+  build-validate-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -19,6 +19,32 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Build image (validation)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: ops-runner
+          load: true
+          tags: sairexsms-ops:ci-check
+
+      - name: Validate runtime entrypoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint sh sairexsms-ops:ci-check -lc '
+            test -f /app/web/.next/standalone/server.js
+            test -f /app/web/scripts/start-workers.ts
+            test -f /app/apps/api/src/modules/notifications/queue/sms.worker.ts
+            test -d /app/web/node_modules
+          '
+
+      - name: Validate production compose renders
+        shell: bash
+        run: |
+          set -euo pipefail
+          SAIREX_ENV_FILE=.env.example docker compose -f infra/server/docker-compose.prod.yml config > /dev/null
 
       - name: Log in to GHCR
         uses: docker/login-action@v3

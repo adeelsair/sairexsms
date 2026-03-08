@@ -33,7 +33,8 @@ RUN ln -s /app/web/node_modules /app/node_modules
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+# Use standalone server output for predictable runtime behavior.
+CMD ["node", ".next/standalone/server.js"]
 
 # ---- App Runner (standalone) ----
 FROM node:22-alpine AS app-runner
@@ -48,4 +49,4 @@ COPY --from=builder /app/web/public ./public
 
 EXPOSE 3000
 
-CMD ["node", "web/server.js"]
+CMD ["node", "server.js", "-p", "3000", "-H", "0.0.0.0"]

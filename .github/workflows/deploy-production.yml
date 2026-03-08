@@ -95,4 +95,5 @@ jobs:
             APP_DIR="${APP_DIR}" \
             COMPOSE_FILE_PATH="infra/server/docker-compose.prod.yml" \
             ENV_FILE_PATH="infra/server/server.env.live" \
+            SAIREX_ENV_FILE_VALUE="server.env.live" \
             infra/server/deploy-safe.sh

@@ -5,6 +5,7 @@ set -Eeuo pipefail
 APP_DIR="${APP_DIR:-/home/sairex/SairexSMS}"
 COMPOSE_FILE_PATH="${COMPOSE_FILE_PATH:-infra/server/docker-compose.prod.yml}"
 ENV_FILE_PATH="${ENV_FILE_PATH:-infra/server/server.env.live}"
+SAIREX_ENV_FILE_VALUE="${SAIREX_ENV_FILE_VALUE:-$(basename "${ENV_FILE_PATH}")}"
 IMAGE_REF="${IMAGE_REF:?IMAGE_REF is required (example: ghcr.io/owner/sairexsms:sha-abc123)}"
 RUN_MIGRATIONS="${RUN_MIGRATIONS:-true}"
 CREATE_DB_BACKUP="${CREATE_DB_BACKUP:-true}"
@@ -25,6 +26,11 @@ if [[ ! -f "${ENV_FILE_PATH}" ]]; then
   exit 1
 fi
 
+compose_cmd() {
+  SAIREX_ENV_FILE="${SAIREX_ENV_FILE_VALUE}" \
+    docker compose -f "${COMPOSE_FILE_PATH}" --env-file "${ENV_FILE_PATH}" "$@"
+}
+
 timestamp="$(date +%Y%m%d_%H%M%S)"
 env_backup="${ENV_FILE_PATH}.bak.${timestamp}"
 cp "${ENV_FILE_PATH}" "${env_backup}"
@@ -33,7 +39,7 @@ rollback() {
   echo "Deployment failed. Rolling back..."
   cp "${env_backup}" "${ENV_FILE_PATH}"
 
-  if ! docker compose -f "${COMPOSE_FILE_PATH}" --env-file "${ENV_FILE_PATH}" up -d app worker sms_worker; then
+  if ! compose_cmd up -d app worker sms_worker; then
     echo "Rollback service restart failed. Manual intervention required." >&2
   fi
 }
@@ -41,10 +47,13 @@ rollback() {
 trap rollback ERR
 
 if [[ "${CREATE_DB_BACKUP}" == "true" ]]; then
-  mkdir -p "${BACKUP_DIR}"
+  if ! mkdir -p "${BACKUP_DIR}" 2>/dev/null; then
+    BACKUP_DIR="${APP_DIR}/backups"
+    mkdir -p "${BACKUP_DIR}"
+  fi
   backup_file="${BACKUP_DIR}/db_${timestamp}.sql"
   echo "Creating database backup: ${backup_file}"
-  docker compose -f "${COMPOSE_FILE_PATH}" --env-file "${ENV_FILE_PATH}" exec -T db \
+  compose_cmd exec -T db \
     pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" > "${backup_file}"
 fi
 
@@ -55,18 +64,18 @@ else
 fi
 
 echo "Validating compose configuration..."
-docker compose -f "${COMPOSE_FILE_PATH}" --env-file "${ENV_FILE_PATH}" config > /dev/null
+compose_cmd config > /dev/null
 
 echo "Pulling latest images..."
-docker compose -f "${COMPOSE_FILE_PATH}" --env-file "${ENV_FILE_PATH}" pull app worker sms_worker migrate
+compose_cmd pull app worker sms_worker migrate
 
 if [[ "${RUN_MIGRATIONS}" == "true" ]]; then
   echo "Running migrations..."
-  docker compose -f "${COMPOSE_FILE_PATH}" --env-file "${ENV_FILE_PATH}" run --rm migrate
+  compose_cmd run --rm migrate
 fi
 
 echo "Starting updated services..."
-docker compose -f "${COMPOSE_FILE_PATH}" --env-file "${ENV_FILE_PATH}" up -d app worker sms_worker
+compose_cmd up -d app worker sms_worker
 
 echo "Waiting for app container health..."
 for i in {1..20}; do
@@ -83,7 +92,7 @@ if [[ "${app_health}" != "healthy" && "${app_health}" != "running" ]]; then
   exit 1
 fi
 
-if ! docker compose -f "${COMPOSE_FILE_PATH}" --env-file "${ENV_FILE_PATH}" ps --status running | grep -q "sairex_sms_worker"; then
+if [[ -z "$(compose_cmd ps --status running sms_worker | awk 'NR>1 {print}')" ]]; then
   echo "SMS worker is not running." >&2
   exit 1
 fi
