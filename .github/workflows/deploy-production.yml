@@ -93,12 +93,18 @@ jobs:
             git pull --ff-only origin main
             sed -i 's/\r$//' infra/server/deploy-safe.sh infra/server/docker-compose.prod.yml
             chmod +x infra/server/deploy-safe.sh
+            ENV_FILE_PATH="infra/server/server.env.live"
+            SAIREX_ENV_FILE_VALUE="server.env.live"
+            if [ ! -f "${ENV_FILE_PATH}" ]; then
+              ENV_FILE_PATH="infra/server/.env"
+              SAIREX_ENV_FILE_VALUE=".env"
+            fi
 
             IMAGE_REF="${{ steps.image.outputs.image_ref }}" \
             RUN_MIGRATIONS="${{ steps.image.outputs.run_migrations }}" \
             CREATE_DB_BACKUP="${{ steps.image.outputs.create_db_backup }}" \
             APP_DIR="${APP_DIR}" \
             COMPOSE_FILE_PATH="infra/server/docker-compose.prod.yml" \
-            ENV_FILE_PATH="infra/server/server.env.live" \
-            SAIREX_ENV_FILE_VALUE="server.env.live" \
+            ENV_FILE_PATH="${ENV_FILE_PATH}" \
+            SAIREX_ENV_FILE_VALUE="${SAIREX_ENV_FILE_VALUE}" \
             infra/server/deploy-safe.sh
