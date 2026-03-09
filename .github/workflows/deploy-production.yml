@@ -86,6 +86,10 @@ jobs:
             cd "${APP_DIR}"
             git fetch origin main
             git checkout main
+            # Keep deploy flow resilient if server has local tracked edits.
+            if ! git diff --quiet || ! git diff --cached --quiet; then
+              git stash push -m "auto-predeploy-${GITHUB_RUN_ID}" || true
+            fi
             git pull --ff-only origin main
             chmod +x infra/server/deploy-safe.sh
 
