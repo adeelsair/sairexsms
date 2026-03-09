@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -69,7 +70,7 @@ function trendLabel(trend: OperationalHealthResponse["trend"]) {
   return "→ Stable";
 }
 
-export default function MobileInsightsPage() {
+function MobileInsightsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const orgId = searchParams.get("orgId");
@@ -457,5 +458,19 @@ export default function MobileInsightsPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function MobileInsightsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-4 p-4 pb-20 text-sm text-muted-foreground">
+          Loading insights...
+        </div>
+      }
+    >
+      <MobileInsightsContent />
+    </Suspense>
   );
 }
