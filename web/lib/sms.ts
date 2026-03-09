@@ -1,6 +1,6 @@
 import axios from "axios";
 
-function normalizePkPhone(phone: string): string {
+export function normalizePkPhone(phone: string): string {
   const digits = phone.replace(/\D/g, "");
 
   // 03XXXXXXXXX -> 923XXXXXXXXX
@@ -17,23 +17,62 @@ function normalizePkPhone(phone: string): string {
   return digits;
 }
 
+function isDryRunEnabled(): boolean {
+  const value = (process.env.SMS_DRY_RUN ?? "").trim().toLowerCase();
+  return value === "1" || value === "true" || value === "yes";
+}
+
+function assertSmsProviderConfigured() {
+  const hash = process.env.VEEVO_HASH;
+  const sender = process.env.VEEVO_SENDER;
+
+  if (!hash || !sender) {
+    if (isDryRunEnabled()) {
+      return { hash: "", sender: "" };
+    }
+    throw new Error("VEEVO_HASH or VEEVO_SENDER is missing");
+  }
+
+  return { hash, sender };
+}
+
+function isProviderFailure(data: unknown): boolean {
+  if (typeof data === "string") {
+    const normalized = data.trim().toUpperCase();
+    return normalized.includes("FAILED") || normalized.includes("ERROR");
+  }
+
+  if (data && typeof data === "object") {
+    const status = String((data as { STATUS?: unknown }).STATUS ?? "").toUpperCase();
+    const code = String((data as { CODE?: unknown }).CODE ?? "").toUpperCase();
+    return status === "FAILED" || code === "FAILED" || code === "ERROR";
+  }
+
+  return false;
+}
+
 /**
  * Sends SMS through Veevo Tech.
  * Uses hash-based auth (primary), with optional login/password attached if provided.
  */
 export async function sendSmsMessage(to: string, text: string): Promise<void> {
-  const hash = process.env.VEEVO_HASH;
-  const sender = process.env.VEEVO_SENDER;
+  const { hash, sender } = assertSmsProviderConfigured();
   const loginId = process.env.VEEVO_LOGIN_ID;
   const password = process.env.VEEVO_PASSWORD;
+  const normalizedPhone = normalizePkPhone(to);
 
-  if (!hash || !sender) {
-    throw new Error("VEEVO_HASH or VEEVO_SENDER is missing");
+  if (!normalizedPhone || normalizedPhone.length < 10) {
+    throw new Error(`Invalid phone number: ${to}`);
+  }
+
+  if (isDryRunEnabled()) {
+    console.log(`[SMS DRY RUN] to=${normalizedPhone} text="${text}"`);
+    return;
   }
 
   const params = new URLSearchParams({
     hash,
-    receivenum: normalizePkPhone(to),
+    receivenum: normalizedPhone,
     sendernum: sender,
     textmessage: text,
   });
@@ -45,13 +84,13 @@ export async function sendSmsMessage(to: string, text: string): Promise<void> {
   const url = `https://api.veevotech.com/sendsms?${params.toString()}`;
   const res = await axios.get(url, { timeout: 15000 });
 
-  console.log(`[Veevo SMS] to=${normalizePkPhone(to)} sender=${sender} status=${res.status} response=`, res.data);
+  console.log(`[Veevo SMS] to=${normalizedPhone} sender=${sender} status=${res.status} response=`, res.data);
 
   if (res.status < 200 || res.status >= 300) {
     throw new Error(`Veevo SMS HTTP ${res.status}: ${JSON.stringify(res.data)}`);
   }
 
-  if (res.data && typeof res.data === "object" && res.data.STATUS === "FAILED") {
+  if (isProviderFailure(res.data)) {
     throw new Error(`Veevo SMS failed: ${JSON.stringify(res.data)}`);
   }
 }

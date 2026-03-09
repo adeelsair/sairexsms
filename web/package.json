@@ -13,6 +13,7 @@
     "lint": "eslint",
     "worker": "npx tsx scripts/start-workers.ts",
     "worker:dev": "npx tsx scripts/start-workers.ts",
+    "test:sms-engine": "npx tsx scripts/test-sms-engine.ts",
     "test": "vitest run",
     "test:finance": "dotenv -e .env.test -- vitest run tests/finance.reconciliation.test.ts",
     "test:finance:migrate": "dotenv -e .env.test -- prisma migrate deploy --schema ../prisma/schema.prisma"
