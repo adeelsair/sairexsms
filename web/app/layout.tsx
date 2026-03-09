@@ -2,12 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { AuthSessionProvider } from "@/components/session-provider";
-import { AppQueryProvider } from "@/components/query-provider";
-import { ThemeProvider } from "@/components/theme-provider";
-import { TenantThemeProvider } from "@/components/tenant-theme-provider";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { Toaster } from "@/components/ui/sonner";
+import { RootProviders } from "@/components/root-providers";
 import { resolveOrganizationBrandingCapabilities } from "@/lib/billing/branding-capabilities.service";
 import "./globals.css";
 
@@ -89,32 +84,18 @@ export default async function RootLayout({
         className={`${inter.variable} ${jetbrainsMono.variable} min-h-screen bg-background font-sans text-foreground antialiased`}
         suppressHydrationWarning
       >
-        <AuthSessionProvider>
-          <AppQueryProvider>
-            <TenantThemeProvider
-              tenantTheme={
-                resolvedTheme
-                  ? {
-                      ...resolvedTheme,
-                      capabilities: { customPrimaryColor: canUseCustomPrimary },
-                    }
-                  : null
-              }
-            >
-              <ThemeProvider
-                attribute="class"
-                defaultTheme="light"
-                enableSystem
-                disableTransitionOnChange
-              >
-                <TooltipProvider delayDuration={300}>
-                  {children}
-                  <Toaster richColors position="top-right" />
-                </TooltipProvider>
-              </ThemeProvider>
-            </TenantThemeProvider>
-          </AppQueryProvider>
-        </AuthSessionProvider>
+        <RootProviders
+          tenantTheme={
+            resolvedTheme
+              ? {
+                  ...resolvedTheme,
+                  capabilities: { customPrimaryColor: canUseCustomPrimary },
+                }
+              : null
+          }
+        >
+          {children}
+        </RootProviders>
       </body>
     </html>
   );
