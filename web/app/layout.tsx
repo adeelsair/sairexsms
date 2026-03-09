@@ -33,21 +33,39 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await auth();
-  const user = session?.user as { organizationId?: string | null } | undefined;
-  const organizationId = user?.organizationId ?? null;
-  const branding = organizationId
-    ? await resolveOrganizationBrandingCapabilities(organizationId)
-    : null;
-  const resolvedTheme = organizationId
-    ? await prisma.organization.findUnique({
-        where: { id: organizationId },
-        select: {
-          primaryColor: true,
-          accentColor: true,
-        },
-      })
-    : null;
+  let organizationId: string | null = null;
+  let branding: Awaited<ReturnType<typeof resolveOrganizationBrandingCapabilities>> | null = null;
+  let resolvedTheme: { primaryColor: string | null; accentColor: string | null } | null = null;
+
+  try {
+    const session = await auth();
+    const user = session?.user as { organizationId?: string | null } | undefined;
+    organizationId = user?.organizationId ?? null;
+
+    if (organizationId) {
+      try {
+        branding = await resolveOrganizationBrandingCapabilities(organizationId);
+      } catch {
+        branding = null;
+      }
+
+      try {
+        resolvedTheme = await prisma.organization.findUnique({
+          where: { id: organizationId },
+          select: {
+            primaryColor: true,
+            accentColor: true,
+          },
+        });
+      } catch {
+        resolvedTheme = null;
+      }
+    }
+  } catch {
+    organizationId = null;
+    branding = null;
+    resolvedTheme = null;
+  }
   const canUseCustomPrimary = branding?.capabilities.customPrimaryColor ?? false;
   const initialPrimary = canUseCustomPrimary
     ? (resolvedTheme?.primaryColor ?? "#1D4E89")
