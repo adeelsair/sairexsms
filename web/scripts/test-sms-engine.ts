@@ -145,8 +145,7 @@ async function main() {
     console.log(`[SMS Test] Completed child jobs: ${completedCount}/${count}`);
     if (failedCount > 0) {
       console.error("[SMS Test] Failed child jobs:", refreshed.filter((job) => job.status !== "COMPLETED"));
-      process.exitCode = 1;
-      return;
+      throw new Error(`SMS child job failures detected: ${failedCount}/${count}`);
     }
 
     if (failed.length > 0) {
