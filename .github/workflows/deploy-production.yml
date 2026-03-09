@@ -99,6 +99,12 @@ jobs:
               ENV_FILE_PATH="infra/server/.env"
               SAIREX_ENV_FILE_VALUE=".env"
             fi
+            if ! grep -q '^DIRECT_URL=' "${ENV_FILE_PATH}" && grep -q '^DATABASE_URL=' "${ENV_FILE_PATH}"; then
+              db_url="$(grep '^DATABASE_URL=' "${ENV_FILE_PATH}" | head -n1 | cut -d'=' -f2-)"
+              if [ -n "${db_url}" ]; then
+                echo "DIRECT_URL=${db_url}" >> "${ENV_FILE_PATH}"
+              fi
+            fi
 
             IMAGE_REF="${{ steps.image.outputs.image_ref }}" \
             RUN_MIGRATIONS="${{ steps.image.outputs.run_migrations }}" \
