@@ -3,6 +3,7 @@
 import { SessionProvider } from "next-auth/react";
 import type { ReactNode } from "react";
 import { Component } from "react";
+import { usePathname } from "next/navigation";
 
 class SessionProviderErrorBoundary extends Component<
   { children: ReactNode },
@@ -30,6 +31,20 @@ class SessionProviderErrorBoundary extends Component<
 }
 
 export function AuthSessionProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const isPublicRoute =
+    pathname === "/" ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/signup") ||
+    pathname.startsWith("/forgot-password") ||
+    pathname.startsWith("/reset-password") ||
+    pathname.startsWith("/verify-email") ||
+    pathname.startsWith("/join");
+
+  if (isPublicRoute) {
+    return <>{children}</>;
+  }
+
   return (
     <SessionProviderErrorBoundary>
       <SessionProvider>{children}</SessionProvider>
