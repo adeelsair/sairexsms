@@ -27,7 +27,7 @@ services:
   app:
     image: ${SAIREX_IMAGE:-ghcr.io/YOUR_GITHUB_USERNAME/sairexsms-ops:latest}
     container_name: sairex_app
-    command: node /app/web/.next/standalone/server.js -p 3000 -H 0.0.0.0
+    command: node /app/web/server.js -p 3000 -H 0.0.0.0
     restart: always
     environment:
       HOSTNAME: 0.0.0.0

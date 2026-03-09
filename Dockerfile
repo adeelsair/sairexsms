@@ -30,11 +30,15 @@ COPY --from=builder /app/web ./
 COPY --from=builder /app/prisma ../prisma
 COPY --from=builder /app/apps ../apps
 RUN ln -s /app/web/node_modules /app/node_modules
+RUN cp /app/web/.next/standalone/server.js /app/web/server.js
+RUN mkdir -p /app/web/.next/standalone/.next
+RUN ln -sfn /app/web/.next/static /app/web/.next/standalone/.next/static
+RUN ln -sfn /app/web/public /app/web/.next/standalone/public
 
 EXPOSE 3000
 
 # Use standalone server output for predictable runtime behavior.
-CMD ["node", ".next/standalone/server.js"]
+CMD ["node", "server.js", "-p", "3000", "-H", "0.0.0.0"]
 
 # ---- App Runner (standalone) ----
 FROM node:22-alpine AS app-runner
