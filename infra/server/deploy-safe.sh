@@ -51,6 +51,12 @@ if [[ "${CREATE_DB_BACKUP}" == "true" ]]; then
     BACKUP_DIR="${APP_DIR}/backups"
     mkdir -p "${BACKUP_DIR}"
   fi
+  if ! touch "${BACKUP_DIR}/.write_test" 2>/dev/null; then
+    BACKUP_DIR="${APP_DIR}/backups"
+    mkdir -p "${BACKUP_DIR}"
+  else
+    rm -f "${BACKUP_DIR}/.write_test"
+  fi
   backup_file="${BACKUP_DIR}/db_${timestamp}.sql"
   echo "Creating database backup: ${backup_file}"
   compose_cmd exec -T db \
