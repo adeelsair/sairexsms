@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import {
   type MobileTodayActionsResponse,
 } from "@/lib/hooks/useMobileTodayActions";
 
-export default function MobileDashboardPage() {
+function MobileDashboardContent() {
   const searchParams = useSearchParams();
   const orgId = searchParams.get("orgId");
   const { data, isLoading, isError, refetch } = useMobileTodayActions(orgId);
@@ -277,5 +277,19 @@ export default function MobileDashboardPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function MobileDashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-background p-4 text-sm text-muted">
+          Loading actions...
+        </div>
+      }
+    >
+      <MobileDashboardContent />
+    </Suspense>
   );
 }
