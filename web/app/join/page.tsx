@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
@@ -37,7 +37,7 @@ type InviteClaimResponse = {
   membershipId: number;
 };
 
-export default function JoinPage() {
+function JoinPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = useMemo(() => searchParams.get("token") ?? "", [searchParams]);
@@ -231,5 +231,19 @@ export default function JoinPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function JoinPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-md p-4 text-sm text-muted-foreground">
+          Loading invite...
+        </div>
+      }
+    >
+      <JoinPageContent />
+    </Suspense>
   );
 }
