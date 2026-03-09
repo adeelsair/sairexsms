@@ -91,6 +91,7 @@ jobs:
               git stash push -m "auto-predeploy-$(date +%s)" || true
             fi
             git pull --ff-only origin main
+            sed -i 's/\r$//' infra/server/deploy-safe.sh infra/server/docker-compose.prod.yml
             chmod +x infra/server/deploy-safe.sh
 
             IMAGE_REF="${{ steps.image.outputs.image_ref }}" \
