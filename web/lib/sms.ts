@@ -22,6 +22,14 @@ function isDryRunEnabled(): boolean {
   return value === "1" || value === "true" || value === "yes";
 }
 
+function resolveSmsProvider(): "veevo" | "android_gateway" {
+  const provider = (process.env.SMS_PROVIDER ?? "veevo").trim().toLowerCase();
+  if (provider === "android_gateway") {
+    return "android_gateway";
+  }
+  return "veevo";
+}
+
 function assertSmsProviderConfigured() {
   const hash = process.env.VEEVO_HASH;
   const sender = process.env.VEEVO_SENDER;
@@ -51,15 +59,49 @@ function isProviderFailure(data: unknown): boolean {
   return false;
 }
 
+async function sendViaAndroidGateway(to: string, text: string): Promise<void> {
+  const gatewayUrl = (process.env.ANDROID_SMS_GATEWAY_URL ?? "").trim();
+  const token = (process.env.ANDROID_SMS_GATEWAY_TOKEN ?? "").trim();
+
+  if (!gatewayUrl) {
+    throw new Error("ANDROID_SMS_GATEWAY_URL is missing");
+  }
+
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await axios.post(
+    gatewayUrl,
+    {
+      to,
+      message: text,
+    },
+    {
+      timeout: 15000,
+      headers,
+    },
+  );
+
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`Android gateway HTTP ${response.status}: ${JSON.stringify(response.data)}`);
+  }
+
+  if (isProviderFailure(response.data)) {
+    throw new Error(`Android gateway failed: ${JSON.stringify(response.data)}`);
+  }
+
+  console.log(`[Android SMS Gateway] to=${to} status=${response.status} response=`, response.data);
+}
+
 /**
  * Sends SMS through Veevo Tech.
  * Uses hash-based auth (primary), with optional login/password attached if provided.
  */
 export async function sendSmsMessage(to: string, text: string): Promise<void> {
-  const { hash, sender } = assertSmsProviderConfigured();
-  const loginId = process.env.VEEVO_LOGIN_ID;
-  const password = process.env.VEEVO_PASSWORD;
   const normalizedPhone = normalizePkPhone(to);
+  const provider = resolveSmsProvider();
 
   if (!normalizedPhone || normalizedPhone.length < 10) {
     throw new Error(`Invalid phone number: ${to}`);
@@ -69,6 +111,15 @@ export async function sendSmsMessage(to: string, text: string): Promise<void> {
     console.log(`[SMS DRY RUN] to=${normalizedPhone} text="${text}"`);
     return;
   }
+
+  if (provider === "android_gateway") {
+    await sendViaAndroidGateway(normalizedPhone, text);
+    return;
+  }
+
+  const { hash, sender } = assertSmsProviderConfigured();
+  const loginId = process.env.VEEVO_LOGIN_ID;
+  const password = process.env.VEEVO_PASSWORD;
 
   const params = new URLSearchParams({
     hash,

@@ -5,6 +5,7 @@ import { normalizePkPhone, sendSmsMessage } from "@/lib/sms";
 vi.mock("axios", () => ({
   default: {
     get: vi.fn(),
+    post: vi.fn(),
   },
 }));
 
@@ -24,10 +25,13 @@ describe("sendSmsMessage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     delete process.env.SMS_DRY_RUN;
+    delete process.env.SMS_PROVIDER;
     delete process.env.VEEVO_HASH;
     delete process.env.VEEVO_SENDER;
     delete process.env.VEEVO_LOGIN_ID;
     delete process.env.VEEVO_PASSWORD;
+    delete process.env.ANDROID_SMS_GATEWAY_URL;
+    delete process.env.ANDROID_SMS_GATEWAY_TOKEN;
   });
 
   it("throws when provider credentials are missing and dry-run is disabled", async () => {
@@ -67,6 +71,31 @@ describe("sendSmsMessage", () => {
     mockedAxios.get.mockResolvedValue({ status: 200, data: "FAILED: invalid sender" } as never);
 
     await expect(sendSmsMessage("03001234567", "Hi")).rejects.toThrow("Veevo SMS failed");
+  });
+
+  it("throws when android gateway url is missing", async () => {
+    process.env.SMS_PROVIDER = "android_gateway";
+    await expect(sendSmsMessage("03001234567", "Hi")).rejects.toThrow(
+      "ANDROID_SMS_GATEWAY_URL is missing",
+    );
+  });
+
+  it("calls android gateway endpoint when configured", async () => {
+    process.env.SMS_PROVIDER = "android_gateway";
+    process.env.ANDROID_SMS_GATEWAY_URL = "https://phone-gateway.local/send";
+    process.env.ANDROID_SMS_GATEWAY_TOKEN = "token";
+    mockedAxios.post.mockResolvedValue({ status: 200, data: { status: "ok" } } as never);
+
+    await sendSmsMessage("03001234567", "Hi from gateway");
+
+    expect(mockedAxios.post).toHaveBeenCalledOnce();
+    expect(mockedAxios.post).toHaveBeenCalledWith(
+      "https://phone-gateway.local/send",
+      { to: "923001234567", message: "Hi from gateway" },
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer token" }),
+      }),
+    );
   });
 });
 
