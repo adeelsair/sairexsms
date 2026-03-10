@@ -7,7 +7,7 @@ import { api } from "@/lib/api-client";
 export default function LogoutButton() {
   const handleLogout = async () => {
     await api.post<{ ok: boolean }>("/api/auth/local-logout");
-    window.location.href = "/login";
+    window.location.href = "/";
   };
 
   return (
