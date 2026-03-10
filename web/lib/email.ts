@@ -24,8 +24,13 @@ export async function sendEmail(opts: {
   html: string;
 }): Promise<boolean> {
   try {
+    const fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER;
+    if (!fromAddress) {
+      throw new Error("SMTP_FROM or SMTP_USER is required");
+    }
+
     await transporter.sendMail({
-      from: `"${process.env.SMTP_FROM_NAME || "SAIREX SMS"}" <${process.env.SMTP_USER}>`,
+      from: `"${process.env.SMTP_FROM_NAME || "SAIREX SMS"}" <${fromAddress}>`,
       to: opts.to,
       subject: opts.subject,
       html: opts.html,
