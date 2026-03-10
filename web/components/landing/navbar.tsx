@@ -20,8 +20,13 @@ import { getLandingButtonThemeStyles } from "./button-theme";
 
 export function LandingNavbar() {
   const [scrolled, setScrolled] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { topBarBackgroundColor, topBarTextColor, bottomBarBackgroundColor } = getAdminChromeColors();
   const { bottomBarFilled } = getLandingButtonThemeStyles();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const scrollRoot = document.getElementById("landing-scroll-root");
@@ -99,65 +104,81 @@ export function LandingNavbar() {
           </SxButton>
         </div>
 
-        <Sheet>
-          <SheetTrigger asChild>
-            <SxButton
-              sxVariant="outline"
-              className="px-2.5 md:hidden"
-              style={{
-                color: topBarTextColor,
-                borderColor: "currentColor",
-                backgroundColor: "transparent",
-              }}
-              aria-label="Open navigation menu"
-            >
-              <Menu className="h-5 w-5" />
-            </SxButton>
-          </SheetTrigger>
-          <SheetContent side="right" className="w-[85vw] border-border p-0 sm:max-w-sm">
-            <SheetHeader className="border-b border-border p-4">
-              <SheetTitle>Menu</SheetTitle>
-              <SheetDescription>Navigate SairexSMS and start your free trial.</SheetDescription>
-            </SheetHeader>
+        {mounted ? (
+          <Sheet>
+            <SheetTrigger asChild>
+              <SxButton
+                sxVariant="outline"
+                className="px-2.5 md:hidden"
+                style={{
+                  color: topBarTextColor,
+                  borderColor: "currentColor",
+                  backgroundColor: "transparent",
+                }}
+                aria-label="Open navigation menu"
+              >
+                <Menu className="h-5 w-5" />
+              </SxButton>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[85vw] border-border p-0 sm:max-w-sm">
+              <SheetHeader className="border-b border-border p-4">
+                <SheetTitle>Menu</SheetTitle>
+                <SheetDescription>Navigate SairexSMS and start your free trial.</SheetDescription>
+              </SheetHeader>
 
-            <div className="space-y-1 p-4">
-              {landingContent.nav.items.map((item) => (
-                <SheetClose key={item.label} asChild>
-                  <a
-                    href={item.href}
-                    className="block rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+              <div className="space-y-1 p-4">
+                {landingContent.nav.items.map((item) => (
+                  <SheetClose key={item.label} asChild>
+                    <a
+                      href={item.href}
+                      className="block rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+                    >
+                      {item.label}
+                    </a>
+                  </SheetClose>
+                ))}
+              </div>
+
+              <div className="mt-auto space-y-3 border-t border-border p-4">
+                <SheetClose asChild>
+                  <SxButton
+                    asChild
+                    sxVariant="outline"
+                    className="w-full"
+                    style={{
+                      color: bottomBarBackgroundColor,
+                      borderColor: "currentColor",
+                      backgroundColor: "transparent",
+                    }}
                   >
-                    {item.label}
-                  </a>
+                    <Link href={landingContent.nav.actions.loginHref}>Login</Link>
+                  </SxButton>
                 </SheetClose>
-              ))}
-            </div>
-
-            <div className="mt-auto space-y-3 border-t border-border p-4">
-              <SheetClose asChild>
-                <SxButton
-                  asChild
-                  sxVariant="outline"
-                  className="w-full"
-                  style={{
-                    color: bottomBarBackgroundColor,
-                    borderColor: "currentColor",
-                    backgroundColor: "transparent",
-                  }}
-                >
-                  <Link href={landingContent.nav.actions.loginHref}>Login</Link>
-                </SxButton>
-              </SheetClose>
-              <SheetClose asChild>
-                <SxButton asChild sxVariant="primary" className="w-full" style={bottomBarFilled}>
-                  <Link href={landingContent.nav.actions.signupHref}>
-                    {landingContent.nav.actions.signupLabel}
-                  </Link>
-                </SxButton>
-              </SheetClose>
-            </div>
-          </SheetContent>
-        </Sheet>
+                <SheetClose asChild>
+                  <SxButton asChild sxVariant="primary" className="w-full" style={bottomBarFilled}>
+                    <Link href={landingContent.nav.actions.signupHref}>
+                      {landingContent.nav.actions.signupLabel}
+                    </Link>
+                  </SxButton>
+                </SheetClose>
+              </div>
+            </SheetContent>
+          </Sheet>
+        ) : (
+          <SxButton
+            sxVariant="outline"
+            className="px-2.5 md:hidden"
+            style={{
+              color: topBarTextColor,
+              borderColor: "currentColor",
+              backgroundColor: "transparent",
+            }}
+            aria-label="Open navigation menu"
+            disabled
+          >
+            <Menu className="h-5 w-5" />
+          </SxButton>
+        )}
       </nav>
     </header>
   );
