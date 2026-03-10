@@ -91,11 +91,12 @@ export default async function AdminLayout({
       ? "All Campuses"
       : "Global";
   const simpleMode = isSimpleMode(orgMode.mode);
+  const isSuperAdmin = user.platformRole === "SUPER_ADMIN" || user.role === "SUPER_ADMIN";
   const filteredNavigation = simpleMode
     ? navigation
         .map((group) => ({
           ...group,
-          items: group.items.filter((item) => !item.proOnly),
+          items: group.items.filter((item) => isSuperAdmin || !item.proOnly),
         }))
         .filter((group) => group.items.length > 0)
     : navigation;
