@@ -112,6 +112,7 @@ export const navigation: NavGroup[] = [
     items: [
       { label: "Students", href: "/admin/students", icon: "GraduationCap" },
       { label: "Payments", href: "/admin/payments", icon: "HandCoins" },
+      { label: "Communications", href: "/admin/communications", icon: "MessageSquare", proOnly: true },
       { label: "Fee Module", href: "/admin/finance", icon: "Wallet" },
       { label: "Reminders", href: "/admin/reminders", icon: "ScrollText", proOnly: true },
       { label: "Finance Dashboard", href: "/admin/finance/dashboard", icon: "BarChart3", proOnly: true },
