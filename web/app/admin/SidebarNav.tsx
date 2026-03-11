@@ -25,6 +25,7 @@ import {
   Wrench,
   BarChart3,
   Settings,
+  MessageSquare,
 } from "lucide-react";
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
@@ -47,6 +48,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
   Wrench,
   BarChart3,
   Settings,
+  MessageSquare,
 };
 
 interface SidebarNavProps {
