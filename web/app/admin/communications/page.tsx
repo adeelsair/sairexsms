@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { RefreshCw, Send } from "lucide-react";
@@ -25,6 +24,14 @@ import {
   type SendSingleSmsInput,
   type SendBulkSmsInput,
 } from "@/lib/validations/sms";
+import {
+  sendBulkEmailSchema,
+  sendWhatsAppBulkSchema,
+  sendWhatsAppSingleSchema,
+  type SendBulkEmailInput,
+  type SendWhatsAppBulkInput,
+  type SendWhatsAppSingleInput,
+} from "@/lib/validations/communications";
 
 type CommunicationChannel = "SMS" | "EMAIL" | "WHATSAPP";
 
@@ -34,7 +41,8 @@ interface BulkSmsRecipient {
 }
 
 interface BulkSmsResponse {
-  jobId: string;
+  jobIds?: string[];
+  jobId?: string;
   message: string;
 }
 
@@ -120,10 +128,31 @@ function parseRecipients(text: string): BulkSmsRecipient[] {
     .filter((recipient) => recipient.phone.length >= 7);
 }
 
+interface BulkEmailRecipient {
+  name?: string;
+  email: string;
+}
+
+function parseEmailRecipients(text: string): BulkEmailRecipient[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => {
+      const parts = line.split(",").map((part) => part.trim());
+      if (parts.length >= 2) {
+        return { name: parts[0], email: parts[1] };
+      }
+      return { email: parts[0] };
+    })
+    .filter((recipient) => recipient.email.includes("@"));
+}
+
 export default function AdminCommunicationsPage() {
-  const router = useRouter();
   const [channel, setChannel] = useState<CommunicationChannel>("SMS");
   const [smsMode, setSmsMode] = useState<"single" | "bulk">("single");
+  const [emailMode, setEmailMode] = useState<"single" | "bulk">("single");
+  const [whatsAppMode, setWhatsAppMode] = useState<"single" | "bulk">("single");
   const [jobs, setJobs] = useState<ChannelJobRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -134,6 +163,21 @@ export default function AdminCommunicationsPage() {
 
   const bulkForm = useForm<SendBulkSmsInput>({
     resolver: zodResolver(sendBulkSmsSchema),
+    defaultValues: { recipientsText: "", message: "" },
+  });
+
+  const emailForm = useForm<SendBulkEmailInput>({
+    resolver: zodResolver(sendBulkEmailSchema),
+    defaultValues: { recipientsText: "", subject: "", message: "" },
+  });
+
+  const whatsAppSingleForm = useForm<SendWhatsAppSingleInput>({
+    resolver: zodResolver(sendWhatsAppSingleSchema),
+    defaultValues: { phone: "", message: "" },
+  });
+
+  const whatsAppBulkForm = useForm<SendWhatsAppBulkInput>({
+    resolver: zodResolver(sendWhatsAppBulkSchema),
     defaultValues: { recipientsText: "", message: "" },
   });
 
@@ -163,6 +207,11 @@ export default function AdminCommunicationsPage() {
       singleForm.reset();
       void fetchChannelJobs("SMS");
     } else if (result.fieldErrors) {
+      for (const [field, messages] of Object.entries(result.fieldErrors)) {
+        if (field === "phone" || field === "message") {
+          singleForm.setError(field, { message: messages[0] });
+        }
+      }
       toast.error("Please fix the validation errors");
     } else {
       toast.error(result.error);
@@ -187,6 +236,93 @@ export default function AdminCommunicationsPage() {
       bulkForm.reset();
       void fetchChannelJobs("SMS");
     } else if (result.fieldErrors) {
+      for (const [field, messages] of Object.entries(result.fieldErrors)) {
+        if (field === "recipientsText" || field === "message") {
+          bulkForm.setError(field, { message: messages[0] });
+        }
+      }
+      toast.error("Please fix the validation errors");
+    } else {
+      toast.error(result.error);
+    }
+  };
+
+  const sendEmail = async (values: SendBulkEmailInput) => {
+    const recipients = parseEmailRecipients(values.recipientsText);
+    if (recipients.length === 0) {
+      emailForm.setError("recipientsText", { message: "No valid recipients found" });
+      toast.error("Add at least one valid email recipient");
+      return;
+    }
+
+    const result = await api.post<BulkSmsResponse>("/api/jobs/bulk-email", {
+      subject: values.subject,
+      message: values.message,
+      recipients: emailMode === "single" ? [recipients[0]] : recipients,
+    });
+
+    if (result.ok) {
+      const count = emailMode === "single" ? 1 : recipients.length;
+      toast.success(`Email queued for ${count} recipient${count > 1 ? "s" : ""}`);
+      emailForm.reset();
+      void fetchChannelJobs("EMAIL");
+    } else if (result.fieldErrors) {
+      for (const [field, messages] of Object.entries(result.fieldErrors)) {
+        if (field === "recipientsText" || field === "subject" || field === "message") {
+          emailForm.setError(field, { message: messages[0] });
+        }
+      }
+      toast.error("Please fix the validation errors");
+    } else {
+      toast.error(result.error);
+    }
+  };
+
+  const sendWhatsAppSingle = async (values: SendWhatsAppSingleInput) => {
+    const result = await api.post<BulkSmsResponse>("/api/jobs/bulk-whatsapp", {
+      message: values.message,
+      recipients: [{ phone: values.phone }],
+    });
+
+    if (result.ok) {
+      toast.success("WhatsApp message queued successfully");
+      whatsAppSingleForm.reset();
+      void fetchChannelJobs("WHATSAPP");
+    } else if (result.fieldErrors) {
+      for (const [field, messages] of Object.entries(result.fieldErrors)) {
+        if (field === "phone" || field === "message") {
+          whatsAppSingleForm.setError(field, { message: messages[0] });
+        }
+      }
+      toast.error("Please fix the validation errors");
+    } else {
+      toast.error(result.error);
+    }
+  };
+
+  const sendWhatsAppBulk = async (values: SendWhatsAppBulkInput) => {
+    const recipients = parseRecipients(values.recipientsText);
+    if (recipients.length === 0) {
+      whatsAppBulkForm.setError("recipientsText", { message: "No valid recipients found" });
+      toast.error("Add at least one valid recipient");
+      return;
+    }
+
+    const result = await api.post<BulkSmsResponse>("/api/jobs/bulk-whatsapp", {
+      message: values.message,
+      recipients,
+    });
+
+    if (result.ok) {
+      toast.success(`WhatsApp queued for ${recipients.length} recipients`);
+      whatsAppBulkForm.reset();
+      void fetchChannelJobs("WHATSAPP");
+    } else if (result.fieldErrors) {
+      for (const [field, messages] of Object.entries(result.fieldErrors)) {
+        if (field === "recipientsText" || field === "message") {
+          whatsAppBulkForm.setError(field, { message: messages[0] });
+        }
+      }
       toast.error("Please fix the validation errors");
     } else {
       toast.error(result.error);
@@ -340,25 +476,228 @@ export default function AdminCommunicationsPage() {
         </TabsContent>
 
         <TabsContent value="EMAIL" className="mt-4">
-          <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-            <p className="text-sm text-foreground">
-              Email delivery is active through queued jobs. Use reminders and automated workflows for now.
-            </p>
-            <SxButton sxVariant="outline" onClick={() => router.push("/admin/reminders")}>
-              Open Reminders
-            </SxButton>
-          </div>
+          <Tabs value={emailMode} onValueChange={(value) => setEmailMode(value as "single" | "bulk")}>
+            <TabsList>
+              <TabsTrigger value="single">Single Email</TabsTrigger>
+              <TabsTrigger value="bulk">Bulk Email</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="single" className="mt-4">
+              <Form {...emailForm}>
+                <form onSubmit={emailForm.handleSubmit(sendEmail)} className="rounded-lg border border-border bg-card p-4">
+                  <SxFormSection columns={1}>
+                    <FormField
+                      control={emailForm.control}
+                      name="recipientsText"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email Address</FormLabel>
+                          <FormControl>
+                            <Input placeholder="you@example.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </SxFormSection>
+                  <SxFormSection columns={1}>
+                    <FormField
+                      control={emailForm.control}
+                      name="subject"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Subject</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Subject line" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </SxFormSection>
+                  <SxFormSection columns={1}>
+                    <FormField
+                      control={emailForm.control}
+                      name="message"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Message</FormLabel>
+                          <FormControl>
+                            <Textarea rows={5} placeholder="Write email message..." {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </SxFormSection>
+                  <div className="mt-4">
+                    <SxButton type="submit" sxVariant="primary" icon={<Send size={16} />} loading={emailForm.formState.isSubmitting}>
+                      Send Email
+                    </SxButton>
+                  </div>
+                </form>
+              </Form>
+            </TabsContent>
+
+            <TabsContent value="bulk" className="mt-4">
+              <Form {...emailForm}>
+                <form onSubmit={emailForm.handleSubmit(sendEmail)} className="rounded-lg border border-border bg-card p-4">
+                  <SxFormSection columns={1}>
+                    <FormField
+                      control={emailForm.control}
+                      name="recipientsText"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Recipients</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              rows={6}
+                              placeholder={"One per line: email or name,email\nali@example.com\nAli,ali@example.com"}
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </SxFormSection>
+                  <SxFormSection columns={1}>
+                    <FormField
+                      control={emailForm.control}
+                      name="subject"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Subject</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Subject line" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </SxFormSection>
+                  <SxFormSection columns={1}>
+                    <FormField
+                      control={emailForm.control}
+                      name="message"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Message</FormLabel>
+                          <FormControl>
+                            <Textarea rows={5} placeholder="Write email message..." {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </SxFormSection>
+                  <div className="mt-4">
+                    <SxButton type="submit" sxVariant="primary" icon={<Send size={16} />} loading={emailForm.formState.isSubmitting}>
+                      Queue Bulk Email
+                    </SxButton>
+                  </div>
+                </form>
+              </Form>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="WHATSAPP" className="mt-4">
-          <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-            <p className="text-sm text-foreground">
-              WhatsApp pipeline is available in queue workers. UI sending controls can be added next.
-            </p>
-            <SxButton sxVariant="outline" onClick={() => router.push("/admin/jobs")}>
-              Open Job Monitor
-            </SxButton>
-          </div>
+          <Tabs value={whatsAppMode} onValueChange={(value) => setWhatsAppMode(value as "single" | "bulk")}>
+            <TabsList>
+              <TabsTrigger value="single">Single WhatsApp</TabsTrigger>
+              <TabsTrigger value="bulk">Bulk WhatsApp</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="single" className="mt-4">
+              <Form {...whatsAppSingleForm}>
+                <form onSubmit={whatsAppSingleForm.handleSubmit(sendWhatsAppSingle)} className="rounded-lg border border-border bg-card p-4">
+                  <SxFormSection columns={2}>
+                    <FormField
+                      control={whatsAppSingleForm.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone Number</FormLabel>
+                          <FormControl>
+                            <Input placeholder="03001234567" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div />
+                  </SxFormSection>
+                  <SxFormSection columns={1}>
+                    <FormField
+                      control={whatsAppSingleForm.control}
+                      name="message"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Message</FormLabel>
+                          <FormControl>
+                            <Textarea rows={4} placeholder="Write WhatsApp message..." {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </SxFormSection>
+                  <div className="mt-4">
+                    <SxButton type="submit" sxVariant="primary" icon={<Send size={16} />} loading={whatsAppSingleForm.formState.isSubmitting}>
+                      Send WhatsApp
+                    </SxButton>
+                  </div>
+                </form>
+              </Form>
+            </TabsContent>
+
+            <TabsContent value="bulk" className="mt-4">
+              <Form {...whatsAppBulkForm}>
+                <form onSubmit={whatsAppBulkForm.handleSubmit(sendWhatsAppBulk)} className="rounded-lg border border-border bg-card p-4">
+                  <SxFormSection columns={1}>
+                    <FormField
+                      control={whatsAppBulkForm.control}
+                      name="recipientsText"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Recipients</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              rows={6}
+                              placeholder={"One per line: phone or name,phone\nAli,03001234567\n03007654321"}
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </SxFormSection>
+                  <SxFormSection columns={1}>
+                    <FormField
+                      control={whatsAppBulkForm.control}
+                      name="message"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Message</FormLabel>
+                          <FormControl>
+                            <Textarea rows={4} placeholder="Use {name} for personalization" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </SxFormSection>
+                  <div className="mt-4">
+                    <SxButton type="submit" sxVariant="primary" icon={<Send size={16} />} loading={whatsAppBulkForm.formState.isSubmitting}>
+                      Queue Bulk WhatsApp
+                    </SxButton>
+                  </div>
+                </form>
+              </Form>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
 
