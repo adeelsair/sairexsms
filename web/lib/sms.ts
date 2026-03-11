@@ -22,10 +22,13 @@ function isDryRunEnabled(): boolean {
   return value === "1" || value === "true" || value === "yes";
 }
 
-function resolveSmsProvider(): "veevo" | "android_gateway" {
+function resolveSmsProvider(): "veevo" | "android_gateway" | "smsmobileapi" {
   const provider = (process.env.SMS_PROVIDER ?? "veevo").trim().toLowerCase();
   if (provider === "android_gateway") {
     return "android_gateway";
+  }
+  if (provider === "smsmobileapi") {
+    return "smsmobileapi";
   }
   return "veevo";
 }
@@ -95,6 +98,44 @@ async function sendViaAndroidGateway(to: string, text: string): Promise<void> {
   console.log(`[Android SMS Gateway] to=${to} status=${response.status} response=`, response.data);
 }
 
+async function sendViaSmsMobileApi(to: string, text: string): Promise<void> {
+  const apiKey = (process.env.SMSMOBILE_API_KEY ?? "").trim();
+  if (!apiKey) {
+    throw new Error("SMSMOBILE_API_KEY is missing");
+  }
+
+  const endpoint = (process.env.SMSMOBILE_API_URL ?? "https://api.smsmobileapi.com/sendsms/").trim();
+  const sendWa = (process.env.SMSMOBILE_SEND_WA ?? "").trim();
+  const sendSms = (process.env.SMSMOBILE_SEND_SMS ?? "1").trim();
+
+  const payload = new URLSearchParams({
+    apikey: apiKey,
+    recipients: `+${to}`,
+    message: text,
+    sendsms: sendSms,
+  });
+  if (sendWa) {
+    payload.set("sendwa", sendWa);
+  }
+
+  const response = await axios.post(endpoint, payload.toString(), {
+    timeout: 15000,
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+  });
+
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`SMSMobileAPI HTTP ${response.status}: ${JSON.stringify(response.data)}`);
+  }
+
+  if (isProviderFailure(response.data)) {
+    throw new Error(`SMSMobileAPI failed: ${JSON.stringify(response.data)}`);
+  }
+
+  console.log(`[SMSMobileAPI] to=${to} status=${response.status} response=`, response.data);
+}
+
 /**
  * Sends SMS through Veevo Tech.
  * Uses hash-based auth (primary), with optional login/password attached if provided.
@@ -114,6 +155,11 @@ export async function sendSmsMessage(to: string, text: string): Promise<void> {
 
   if (provider === "android_gateway") {
     await sendViaAndroidGateway(normalizedPhone, text);
+    return;
+  }
+
+  if (provider === "smsmobileapi") {
+    await sendViaSmsMobileApi(normalizedPhone, text);
     return;
   }
 

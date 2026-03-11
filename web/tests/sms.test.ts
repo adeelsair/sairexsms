@@ -32,6 +32,10 @@ describe("sendSmsMessage", () => {
     delete process.env.VEEVO_PASSWORD;
     delete process.env.ANDROID_SMS_GATEWAY_URL;
     delete process.env.ANDROID_SMS_GATEWAY_TOKEN;
+    delete process.env.SMSMOBILE_API_KEY;
+    delete process.env.SMSMOBILE_API_URL;
+    delete process.env.SMSMOBILE_SEND_WA;
+    delete process.env.SMSMOBILE_SEND_SMS;
   });
 
   it("throws when provider credentials are missing and dry-run is disabled", async () => {
@@ -94,6 +98,32 @@ describe("sendSmsMessage", () => {
       { to: "923001234567", message: "Hi from gateway" },
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: "Bearer token" }),
+      }),
+    );
+  });
+
+  it("throws when smsmobileapi key is missing", async () => {
+    process.env.SMS_PROVIDER = "smsmobileapi";
+    await expect(sendSmsMessage("03001234567", "Hi")).rejects.toThrow(
+      "SMSMOBILE_API_KEY is missing",
+    );
+  });
+
+  it("calls smsmobileapi endpoint when configured", async () => {
+    process.env.SMS_PROVIDER = "smsmobileapi";
+    process.env.SMSMOBILE_API_KEY = "api-key";
+    mockedAxios.post.mockResolvedValue({ status: 200, data: "OK" } as never);
+
+    await sendSmsMessage("03001234567", "Hi from smsmobileapi");
+
+    expect(mockedAxios.post).toHaveBeenCalledOnce();
+    expect(mockedAxios.post).toHaveBeenCalledWith(
+      "https://api.smsmobileapi.com/sendsms/",
+      expect.stringContaining("apikey=api-key"),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "Content-Type": "application/x-www-form-urlencoded",
+        }),
       }),
     );
   });
