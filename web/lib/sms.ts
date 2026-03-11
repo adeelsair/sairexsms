@@ -56,7 +56,19 @@ function isProviderFailure(data: unknown): boolean {
   if (data && typeof data === "object") {
     const status = String((data as { STATUS?: unknown }).STATUS ?? "").toUpperCase();
     const code = String((data as { CODE?: unknown }).CODE ?? "").toUpperCase();
-    return status === "FAILED" || code === "FAILED" || code === "ERROR";
+    if (status === "FAILED" || code === "FAILED" || code === "ERROR") {
+      return true;
+    }
+
+    // SMSMobileAPI nested result payload shape
+    const result = (data as { result?: unknown }).result;
+    if (result && typeof result === "object") {
+      const nestedError = String((result as { error?: unknown }).error ?? "").trim();
+      const nestedSent = String((result as { sent?: unknown }).sent ?? "").toLowerCase();
+      if ((nestedError && nestedError !== "0") || nestedSent === "api_error") {
+        return true;
+      }
+    }
   }
 
   return false;
