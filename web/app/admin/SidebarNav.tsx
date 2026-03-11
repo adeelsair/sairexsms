@@ -109,7 +109,10 @@ export function SidebarNav({ groups }: SidebarNavProps) {
 
           <div className="space-y-0.5">
             {group.items.map((item) => {
-              const Icon = ICON_MAP[item.icon];
+              const iconKey = item.icon.trim();
+              const Icon =
+                ICON_MAP[iconKey] ??
+                (item.href === "/admin/communications" ? MessageSquare : undefined);
               const isActive =
                 pathname === item.href ||
                 (item.href !== "/admin/dashboard" &&
