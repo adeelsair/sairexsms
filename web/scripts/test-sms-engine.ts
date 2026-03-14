@@ -5,12 +5,10 @@
  *   SMS_DRY_RUN=true npx tsx scripts/test-sms-engine.ts
  *   SMS_TEST_PHONE=03001234567 SMS_TEST_COUNT=20 SMS_DRY_RUN=true npx tsx scripts/test-sms-engine.ts
  */
-import { prisma } from "@/lib/prisma";
-import { enqueue, BULK_SMS_QUEUE } from "@/lib/queue";
+import { loadEnvConfig } from "@next/env";
 import IORedis from "ioredis";
-import { getRedisConnection } from "@/lib/queue/connection";
-import { startBulkSmsWorker } from "@/lib/queue/workers/bulk-sms.worker";
-import { startSmsWorker } from "@/lib/queue/workers/sms.worker";
+
+loadEnvConfig(process.cwd(), process.env.NODE_ENV !== "production");
 
 type JobStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | "DEAD" | "RETRYING";
 
@@ -45,6 +43,15 @@ async function waitForTerminalStatus(
 }
 
 async function main() {
+  const [{ prisma }, { enqueue, BULK_SMS_QUEUE }, { getRedisConnection }, { startBulkSmsWorker }, { startSmsWorker }] =
+    await Promise.all([
+      import("@/lib/prisma"),
+      import("@/lib/queue"),
+      import("@/lib/queue/connection"),
+      import("@/lib/queue/workers/bulk-sms.worker"),
+      import("@/lib/queue/workers/sms.worker"),
+    ]);
+
   process.env.SMS_DRY_RUN = process.env.SMS_DRY_RUN ?? "true";
   const phone = process.env.SMS_TEST_PHONE ?? "03001234567";
   const count = parseCount(process.env.SMS_TEST_COUNT, 10);

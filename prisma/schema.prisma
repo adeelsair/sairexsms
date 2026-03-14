@@ -1857,6 +1857,99 @@ model PaymentRecord {
   @@index([gatewayRef])
 }
 
+model Invoice {
+  id            String   @id @default(uuid())
+  schoolId      String
+  studentId     String
+  invoiceNumber String   @unique
+  amount        Int
+  amountPaid    Int      @default(0)
+  lateFee       Int      @default(0)
+  lateFeeApplied Boolean @default(false)
+  currency      String   @default("PKR")
+  status        String   @default("PENDING")
+
+  provider      String?
+  providerRef   String?
+
+  dueDate       DateTime
+  paidAt        DateTime?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  payments      Payment[]
+
+  @@index([schoolId, status])
+  @@index([dueDate, status])
+}
+
+model SchoolPaymentConfig {
+  id                 String   @id @default(uuid())
+  schoolId           String   @unique
+  bankName           String?
+  accountTitle       String?
+  accountNumber      String?
+  providerMerchantId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Payment {
+  id             String   @id @default(uuid())
+  invoiceId      String
+  provider       String
+  transactionId  String   @unique
+
+  amount         Int
+  status         String
+
+  paidAt         DateTime?
+
+  createdAt      DateTime @default(now())
+
+  invoice        Invoice  @relation(fields: [invoiceId], references: [id])
+  refunds        Refund[]
+
+  @@index([invoiceId, createdAt])
+}
+
+model PaymentEvent {
+  id          String   @id @default(uuid())
+  paymentId   String?
+  event       String
+  payload     Json
+
+  createdAt   DateTime @default(now())
+}
+
+model Refund {
+  id        String   @id @default(uuid())
+  paymentId String
+  amount    Int
+  reason    String
+  status    String   @default("REQUESTED")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payment   Payment  @relation(fields: [paymentId], references: [id])
+
+  @@index([paymentId, status])
+}
+
+model PaymentLedgerEntry {
+  id            String   @id @default(uuid())
+  type          String
+  amount        Int
+  referenceType String
+  referenceId   String
+  payload       Json?
+  createdAt     DateTime @default(now())
+
+  @@index([type, createdAt])
+  @@index([referenceType, referenceId])
+}
+
 ////////////////////////////////////////////////////////////
 /// LEDGER ENTRY (Financial Truth Layer)
 ////////////////////////////////////////////////////////////
