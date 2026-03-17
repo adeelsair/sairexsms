@@ -148,10 +148,8 @@ export function DashboardClient({
 
     setMode(result.data.mode);
     toast.success(result.data.mode === "PRO" ? "Pro mode enabled" : "Simple mode enabled");
-    if (result.data.mode === "SIMPLE" && !isSuperAdmin) {
-      router.replace("/mobile/dashboard");
-      return;
-    }
+    // Stay on admin dashboard after mode switch; server-side dashboard routing
+    // will send mobile-only roles to /mobile/dashboard when appropriate.
     fetchStats();
   }, [fetchStats, hasOrganizationContext, isSuperAdmin, mode, router]);
 

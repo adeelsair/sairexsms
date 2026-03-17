@@ -5,9 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { SxButton } from "@/components/sx";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api-client";
 import { usePublicOnboardingDraft } from "@/lib/hooks/usePublicOnboardingDraft";
 
@@ -76,34 +74,64 @@ export default function AdminCreatePage() {
     router.push("/onboarding/complete");
   }
 
+  const authInputClass = "bg-background text-foreground placeholder:text-foreground/70";
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Admin User Creation</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label>Admin Name</Label>
-          <Input value={adminName} onChange={(e) => setAdminName(e.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label>Mobile</Label>
-          <Input value={mobile} onChange={(e) => setMobile(e.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label>Password</Label>
+    <div className="rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
+      <h2 className="mb-1 text-xl font-semibold text-foreground">Admin User Creation</h2>
+      <p className="mb-6 text-sm text-muted-foreground">
+        Create the main admin account for your school.
+      </p>
+
+      <div className="space-y-4">
+        <div>
+          <label htmlFor="adminName" className="mb-1.5 block text-sm font-medium text-foreground">
+            Admin Name
+          </label>
           <Input
+            id="adminName"
+            value={adminName}
+            onChange={(e) => setAdminName(e.target.value)}
+            placeholder="Full name"
+            className={authInputClass}
+          />
+        </div>
+        <div>
+          <label htmlFor="adminMobile" className="mb-1.5 block text-sm font-medium text-foreground">
+            Mobile
+          </label>
+          <Input
+            id="adminMobile"
+            value={mobile}
+            onChange={(e) => setMobile(e.target.value)}
+            placeholder="e.g. 03001234567"
+            className={authInputClass}
+          />
+        </div>
+        <div>
+          <label htmlFor="adminPassword" className="mb-1.5 block text-sm font-medium text-foreground">
+            Password
+          </label>
+          <Input
+            id="adminPassword"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            placeholder="Min 8 characters"
+            className={authInputClass}
           />
         </div>
-        <div className="space-y-2">
-          <Label>Confirm Password</Label>
+        <div>
+          <label htmlFor="confirmPassword" className="mb-1.5 block text-sm font-medium text-foreground">
+            Confirm Password
+          </label>
           <Input
+            id="confirmPassword"
             type="password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Same as above"
+            className={authInputClass}
           />
         </div>
 
@@ -115,7 +143,7 @@ export default function AdminCreatePage() {
             Continue
           </SxButton>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

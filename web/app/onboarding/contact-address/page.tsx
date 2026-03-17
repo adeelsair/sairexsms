@@ -64,7 +64,6 @@ function VerifyInline({
   const [otp, setOtp] = useState("");
   const [sending, setSending] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [devCode, setDevCode] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
 
   useEffect(() => {
@@ -97,19 +96,29 @@ function VerifyInline({
 
   const sendOtp = async () => {
     setSending(true);
-    const result = await api.post<{ sent: boolean; devCode?: string }>(
-      "/api/onboarding/verify/send",
-      { channel, target: value },
-    );
+    const result = await api.post<{
+      sent: boolean;
+      smsConfigHint?: string;
+      whatsAppConfigHint?: string;
+    }>("/api/onboarding/verify/send", { channel, target: value });
     setSending(false);
 
     if (result.ok) {
       setOtpSent(true);
       setCooldown(60);
-      if (result.data.devCode) {
-        setDevCode(result.data.devCode);
+      if (result.data.sent) {
+        toast.success(`Verification code sent to ${value}`);
+      } else {
+        const hint =
+          result.data.whatsAppConfigHint ??
+          result.data.smsConfigHint ??
+          (channel === "email"
+            ? "Email not configured."
+            : channel === "mobile"
+              ? "SMS not configured."
+              : "WhatsApp not configured.");
+        toast.info(hint, (result.data.whatsAppConfigHint || result.data.smsConfigHint) ? { duration: 10000 } : undefined);
       }
-      toast.success(`Verification code sent to ${value}`);
     } else {
       toast.error(result.error);
     }
@@ -159,6 +168,12 @@ function VerifyInline({
       <Input
         value={otp}
         onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && otp.length === 6 && !confirming) {
+            e.preventDefault();
+            confirmOtp();
+          }
+        }}
         placeholder="6-digit code"
         className="h-8 w-32 font-mono text-sm tracking-widest"
       />
@@ -178,11 +193,6 @@ function VerifyInline({
       >
         {cooldown > 0 ? `Resend (${cooldown}s)` : "Resend"}
       </button>
-      {devCode && (
-        <span className="text-[10px] text-muted-foreground">
-          Dev: {devCode}
-        </span>
-      )}
     </div>
   );
 }
@@ -191,7 +201,7 @@ function VerifyInline({
 
 export default function OnboardingContactAddressPage() {
   const router = useRouter();
-  const { draft, saveStep, markValidated, isFieldVerified, markFieldVerified, userEmail } =
+  const { draft, saveStep, markValidated, isFieldVerified, markFieldVerified, userEmail, isStepValidated } =
     useOnboarding();
 
   const form = useForm<OnboardingContactAddressInput>({
@@ -238,6 +248,17 @@ export default function OnboardingContactAddressPage() {
     autoVerifyEmail();
   }, [autoVerifyEmail]);
 
+  // Require legal step (with NTN verification) to be validated before using this step.
+  // Defer check so state from legal page (markValidated) is committed before we redirect.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      if (!isStepValidated("legal")) {
+        router.replace("/onboarding/legal");
+      }
+    }, 50);
+    return () => clearTimeout(id);
+  }, [isStepValidated, router]);
+
   const districts = useMemo(() => getDistricts(selectedProvince), [selectedProvince]);
   const tehsils = useMemo(() => getTehsils(selectedProvince, selectedDistrict), [selectedProvince, selectedDistrict]);
   const cities = useMemo(() => getCities(selectedProvince, selectedDistrict, selectedTehsil), [selectedProvince, selectedDistrict, selectedTehsil]);
@@ -278,7 +299,7 @@ export default function OnboardingContactAddressPage() {
   };
 
   return (
-    <div className="rounded-lg border border-border bg-card p-8 shadow-lg">
+    <div className="rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
       <h2 className="mb-1 text-xl font-semibold text-foreground">
         HO Address & Contacts
       </h2>

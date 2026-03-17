@@ -29,7 +29,7 @@ function Section({
 }) {
   const router = useRouter();
   return (
-    <div className="rounded-lg border border-border bg-card">
+    <div className="rounded-xl border border-border bg-card">
       <div className="flex items-center justify-between border-b border-border px-5 py-3">
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
         <SxButton
@@ -49,11 +49,23 @@ function Section({
   );
 }
 
-function Field({ label, value }: { label: string; value: string | undefined | null }) {
+function Field({
+  label,
+  value,
+  truncate,
+}: {
+  label: string;
+  value: string | undefined | null;
+  truncate?: boolean;
+}) {
   return (
-    <div>
+    <div className={truncate ? "min-w-0" : undefined}>
       <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 text-sm text-foreground">{value || "—"}</dd>
+      <dd
+        className={`mt-0.5 text-sm text-foreground ${truncate ? "min-w-0 overflow-hidden text-ellipsis break-all" : ""}`}
+      >
+        {value || "—"}
+      </dd>
     </div>
   );
 }
@@ -117,7 +129,10 @@ export default function OnboardingPreviewPage() {
       toast.success("Organization registered successfully!");
       router.push("/onboarding/confirmation");
     } else if (result.fieldErrors) {
-      toast.error("Validation errors — please go back and fix them");
+      const certError = result.fieldErrors["legal.ntnCertificate"]?.[0];
+      toast.error(
+        certError ?? "Validation errors — please go back and fix them",
+      );
       setSubmitting(false);
     } else {
       toast.error(result.error);
@@ -127,7 +142,7 @@ export default function OnboardingPreviewPage() {
 
   if (!identity) {
     return (
-      <div className="rounded-lg border border-border bg-card p-8 text-center shadow-lg">
+      <div className="rounded-xl border border-border bg-card p-6 text-center shadow-sm sm:p-8">
         <p className="text-muted-foreground">
           No data to preview. Please start from the first step.
         </p>
@@ -145,7 +160,7 @@ export default function OnboardingPreviewPage() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-lg border border-border bg-card p-6 shadow-lg">
+      <div className="rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
         <h2 className="mb-1 text-xl font-semibold text-foreground">
           Review Your Information
         </h2>
@@ -223,7 +238,28 @@ export default function OnboardingPreviewPage() {
       {/* ── Branding ── */}
       <Section title="Branding" editPath="/onboarding/branding">
         <Field label="Website" value={branding?.websiteUrl} />
-        <Field label="Logo URL" value={branding?.logoUrl} />
+        <div className="min-w-0">
+          <dt className="text-xs font-medium text-muted-foreground">Logo</dt>
+          <dd className="mt-0.5 flex items-center gap-3 text-sm text-foreground">
+            {branding?.logoUrl ? (
+              <>
+                <div className="h-10 w-10 shrink-0 overflow-hidden rounded border border-border bg-muted/30">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={branding.logoUrl}
+                    alt="Organization logo"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+                <span className="min-w-0 flex-1 overflow-hidden text-ellipsis break-all text-muted-foreground">
+                  Logo uploaded
+                </span>
+              </>
+            ) : (
+              "—"
+            )}
+          </dd>
+        </div>
       </Section>
 
       {/* ── Terms & Conditions ── */}
@@ -330,8 +366,9 @@ export default function OnboardingPreviewPage() {
               checked={acceptedTerms}
               onCheckedChange={(v) => setAcceptedTerms(v === true)}
               disabled={!scrolledToBottom}
+              className="size-5 shrink-0 border-2 border-border bg-background"
             />
-            <span className="text-sm text-foreground leading-tight">
+            <span className="text-xs text-foreground leading-tight">
               I have read and agree to the{" "}
               <strong>Terms of Service</strong> and{" "}
               <strong>Acceptable Use Policy</strong> of SAIREX SMS.
@@ -343,8 +380,9 @@ export default function OnboardingPreviewPage() {
               checked={acceptedDataPolicy}
               onCheckedChange={(v) => setAcceptedDataPolicy(v === true)}
               disabled={!scrolledToBottom}
+              className="size-5 shrink-0 border-2 border-border bg-background"
             />
-            <span className="text-sm text-foreground leading-tight">
+            <span className="text-xs text-foreground leading-tight">
               I acknowledge that all data provided is accurate and I consent to
               its processing as described in the{" "}
               <strong>Data Protection</strong> clause above.

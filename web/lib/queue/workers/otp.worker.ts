@@ -11,7 +11,7 @@ export interface OtpJobData {
 }
 
 async function processOtpJob(bull: BullJob<OtpJobData>): Promise<void> {
-  const { sendEmail } = await import("@/lib/email");
+  const { sendOtpEmail } = await import("@/lib/email");
 
   const { jobId, channel, target, code } = bull.data;
   const attemptsMade = bull.attemptsMade + 1;
@@ -23,20 +23,7 @@ async function processOtpJob(bull: BullJob<OtpJobData>): Promise<void> {
     let success = false;
 
     if (channel === "email") {
-      success = await sendEmail({
-        to: target,
-        subject: "Your verification code — SAIREX SMS",
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-            <h2 style="color: #1e40af;">SAIREX SMS</h2>
-            <p>Your verification code is:</p>
-            <p style="font-size: 32px; font-weight: bold; letter-spacing: 8px; margin: 24px 0; color: #1e40af;">${code}</p>
-            <p style="color: #64748b; font-size: 14px;">
-              This code expires in 10 minutes. If you didn't request this, ignore this message.
-            </p>
-          </div>
-        `,
-      });
+      success = await sendOtpEmail(target, code);
     } else if (channel === "mobile") {
       const { sendSmsMessage } = await import("@/lib/sms");
       try {

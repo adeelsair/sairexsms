@@ -11,7 +11,14 @@ export default async function DashboardPage() {
   }
 
   const dashboard = await loadAdminDashboard(guard);
-  if (dashboard.mode === "SIMPLE" && !dashboard.isSuperAdmin) {
+  // Only redirect SIMPLE mode users with teacher/mobile role to the mobile dashboard.
+  // Org admins and super admins should stay on the admin dashboard.
+  if (
+    dashboard.mode === "SIMPLE" &&
+    !dashboard.isSuperAdmin &&
+    "role" in guard &&
+    guard.role === "TEACHER"
+  ) {
     redirect("/mobile/dashboard");
   }
 

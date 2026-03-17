@@ -68,7 +68,7 @@ export default function OnboardingIdentityPage() {
   };
 
   return (
-    <div className="rounded-lg border border-border bg-card p-8 shadow-lg">
+    <div className="rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
       <h2 className="mb-1 text-xl font-semibold text-foreground">
         Organization Identity
       </h2>
@@ -85,7 +85,7 @@ export default function OnboardingIdentityPage() {
               <FormItem>
                 <FormLabel>Organization Name (Legal)</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g. The City School (Pvt) Ltd" {...field} />
+                  <Input placeholder="e.g. The City School (Pvt) Ltd" className="bg-background text-foreground placeholder:text-foreground/70" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -99,7 +99,7 @@ export default function OnboardingIdentityPage() {
               <FormItem>
                 <FormLabel>Display Name</FormLabel>
                 <FormControl>
-                  <Input placeholder="e.g. The City School" {...field} />
+                  <Input placeholder="e.g. The City School" className="bg-background text-foreground placeholder:text-foreground/70" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -115,7 +115,10 @@ export default function OnboardingIdentityPage() {
                   <FormLabel>Category</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange}>
                     <FormControl>
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger
+                        className="w-full bg-background text-foreground data-[placeholder]:text-muted-foreground [&>svg]:text-muted-foreground"
+                        aria-label="Organization category"
+                      >
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                     </FormControl>
@@ -140,7 +143,10 @@ export default function OnboardingIdentityPage() {
                   <FormLabel>Structure</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange}>
                     <FormControl>
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger
+                        className="w-full bg-background text-foreground data-[placeholder]:text-muted-foreground [&>svg]:text-muted-foreground"
+                        aria-label="Organization structure"
+                      >
                         <SelectValue placeholder="Select structure" />
                       </SelectTrigger>
                     </FormControl>

@@ -347,7 +347,7 @@ async function resolveTasks(
         type: "PAYMENT_VERIFICATION",
         label: `Verify ${unverifiedPayments} payments`,
         count: unverifiedPayments,
-        href: "/admin/payments?status=pending",
+        href: "/admin/payment-gateway?tab=manual-collection",
       });
     }
   }

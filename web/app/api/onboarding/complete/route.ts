@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireVerifiedAuth } from "@/lib/auth-guard";
 import { generateOrganizationId } from "@/lib/id-generators";
 import { onboardingCompleteSchema } from "@/lib/validations/onboarding";
+import { verifyNtnCertificate } from "@/lib/onboarding/verify-ntn-cert";
 import { generateUnitCode, generateCityCode, buildFullUnitPath } from "@/lib/unit-code";
 import { createUnitProfile } from "@/lib/unit-profile";
 import { bootstrapDemoDataIfEmpty } from "@/lib/bootstrap/demo-seed.service";
@@ -49,6 +50,22 @@ export async function POST(request: Request) {
     }
 
     const { identity, legal, contactAddress, branding } = parsed.data;
+
+    const verify = await verifyNtnCertificate(
+      legal.ntnCertificate,
+      legal.taxNumber,
+      identity.organizationName,
+    );
+    if (!verify.ok) {
+      return NextResponse.json(
+        {
+          errors: {
+            "legal.ntnCertificate": [verify.message],
+          },
+        },
+        { status: 400 },
+      );
+    }
 
     const slug = slugify(identity.displayName);
     const finalSlug = slug.length >= 3 ? slug : `org-${Date.now().toString(36)}`;

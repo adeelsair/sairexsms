@@ -22,11 +22,8 @@ function isDryRunEnabled(): boolean {
   return value === "1" || value === "true" || value === "yes";
 }
 
-function resolveSmsProvider(): "veevo" | "android_gateway" | "smsmobileapi" {
+function resolveSmsProvider(): "veevo" | "smsmobileapi" {
   const provider = (process.env.SMS_PROVIDER ?? "veevo").trim().toLowerCase();
-  if (provider === "android_gateway") {
-    return "android_gateway";
-  }
   if (provider === "smsmobileapi") {
     return "smsmobileapi";
   }
@@ -60,6 +57,12 @@ function isProviderFailure(data: unknown): boolean {
       return true;
     }
 
+    // Veevo: { error: 'AUTH_FAILED' } or similar
+    const error = String((data as { error?: unknown }).error ?? "").trim().toUpperCase();
+    if (error && (error.includes("FAILED") || error.includes("ERROR") || error.includes("AUTH"))) {
+      return true;
+    }
+
     // SMSMobileAPI nested result payload shape
     const result = (data as { result?: unknown }).result;
     if (result && typeof result === "object") {
@@ -72,42 +75,6 @@ function isProviderFailure(data: unknown): boolean {
   }
 
   return false;
-}
-
-async function sendViaAndroidGateway(to: string, text: string): Promise<void> {
-  const gatewayUrl = (process.env.ANDROID_SMS_GATEWAY_URL ?? "").trim();
-  const token = (process.env.ANDROID_SMS_GATEWAY_TOKEN ?? "").trim();
-
-  if (!gatewayUrl) {
-    throw new Error("ANDROID_SMS_GATEWAY_URL is missing");
-  }
-
-  const headers: Record<string, string> = {};
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  const response = await axios.post(
-    gatewayUrl,
-    {
-      to,
-      message: text,
-    },
-    {
-      timeout: 15000,
-      headers,
-    },
-  );
-
-  if (response.status < 200 || response.status >= 300) {
-    throw new Error(`Android gateway HTTP ${response.status}: ${JSON.stringify(response.data)}`);
-  }
-
-  if (isProviderFailure(response.data)) {
-    throw new Error(`Android gateway failed: ${JSON.stringify(response.data)}`);
-  }
-
-  console.log(`[Android SMS Gateway] to=${to} status=${response.status} response=`, response.data);
 }
 
 async function sendViaSmsMobileApi(to: string, text: string): Promise<void> {
@@ -165,35 +132,29 @@ export async function sendSmsMessage(to: string, text: string): Promise<void> {
     return;
   }
 
-  if (provider === "android_gateway") {
-    await sendViaAndroidGateway(normalizedPhone, text);
-    return;
-  }
-
   if (provider === "smsmobileapi") {
     await sendViaSmsMobileApi(normalizedPhone, text);
     return;
   }
 
   const { hash, sender } = assertSmsProviderConfigured();
-  const loginId = process.env.VEEVO_LOGIN_ID;
-  const password = process.env.VEEVO_PASSWORD;
 
-  const params = new URLSearchParams({
+  // Veevo v3 API: POST JSON to https://api.veevotech.com/v3/sendsms
+  const receivernum = normalizedPhone.startsWith("+") ? normalizedPhone : `+${normalizedPhone}`;
+  const body = {
     hash,
-    receivenum: normalizedPhone,
+    receivernum,
     sendernum: sender,
     textmessage: text,
+  };
+
+  const url = "https://api.veevotech.com/v3/sendsms";
+  const res = await axios.post(url, body, {
+    timeout: 15000,
+    headers: { "Content-Type": "application/json" },
   });
 
-  // Keep optional credential params for providers/accounts that require them.
-  if (loginId) params.set("loginid", loginId);
-  if (password) params.set("password", password);
-
-  const url = `https://api.veevotech.com/sendsms?${params.toString()}`;
-  const res = await axios.get(url, { timeout: 15000 });
-
-  console.log(`[Veevo SMS] to=${normalizedPhone} sender=${sender} status=${res.status} response=`, res.data);
+  console.log(`[Veevo SMS] v3 to=${receivernum} sender=${sender} status=${res.status} response=`, res.data);
 
   if (res.status < 200 || res.status >= 300) {
     throw new Error(`Veevo SMS HTTP ${res.status}: ${JSON.stringify(res.data)}`);

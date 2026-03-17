@@ -111,8 +111,7 @@ export const navigation: NavGroup[] = [
     label: "Management",
     items: [
       { label: "Students", href: "/admin/students", icon: "GraduationCap" },
-      { label: "Payments", href: "/admin/payments", icon: "HandCoins" },
-      { label: "Payment Engine", href: "/admin/payment-engine", icon: "Gauge", proOnly: true },
+      { label: "Payment Gateway", href: "/admin/payment-gateway", icon: "HandCoins", proOnly: true },
       { label: "Communications", href: "/admin/communications", icon: "MessageSquare", proOnly: true },
       { label: "Fee Module", href: "/admin/finance", icon: "Wallet" },
       { label: "Reminders", href: "/admin/reminders", icon: "ScrollText", proOnly: true },

@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
+import { OnboardingShell } from "@/components/onboarding/onboarding-shell";
 
 const STEPS = [
   "/onboarding/school-info",
@@ -20,23 +21,24 @@ export default function PublicOnboardingLayout({
   const idx = Math.max(STEPS.indexOf(pathname), 0);
   const progress = Math.round(((idx + 1) / STEPS.length) * 100);
 
-  return (
-    <div className="min-h-screen bg-background px-4 py-6">
-      <div className="mx-auto w-full max-w-md space-y-4">
-        <div className="space-y-2">
-          <p className="text-sm text-muted-foreground">10-Minute School Setup</p>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full bg-primary transition-[width] duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Step {idx + 1} of {STEPS.length}
-          </p>
-        </div>
-        {children}
+  const progressNode = (
+    <div className="space-y-2">
+      <p className="text-xs font-medium opacity-90">10-Minute School Setup</p>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-white/20">
+        <div
+          className="h-full rounded-full bg-white/90 transition-[width] duration-300"
+          style={{ width: `${progress}%` }}
+        />
       </div>
+      <p className="text-xs opacity-80">
+        Step {idx + 1} of {STEPS.length}
+      </p>
     </div>
+  );
+
+  return (
+    <OnboardingShell progressNode={progressNode} maxWidth="max-w-md">
+      {children}
+    </OnboardingShell>
   );
 }

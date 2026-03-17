@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -19,8 +19,10 @@ import { SxButton } from "@/components/sx";
 export default function OnboardingConfirmationPage() {
   const router = useRouter();
   const { completedOrg } = useOnboarding();
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(true);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!completedOrg) {
@@ -31,33 +33,62 @@ export default function OnboardingConfirmationPage() {
   useEffect(() => {
     if (!completedOrg) return;
     setPdfLoading(true);
+    setPdfError(null);
     const url = `/api/onboarding/certificate?orgId=${encodeURIComponent(completedOrg.id)}`;
-    setPdfUrl(url);
-    setPdfLoading(false);
+
+    fetch(url, { credentials: "include" })
+      .then((res) => {
+        if (!res.ok) throw new Error(res.status === 403 ? "Access denied" : "Failed to load certificate");
+        return res.blob();
+      })
+      .then((blob) => {
+        if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+        const blobUrl = URL.createObjectURL(blob);
+        blobUrlRef.current = blobUrl;
+        setPdfBlobUrl(blobUrl);
+      })
+      .catch((err) => {
+        setPdfError(err instanceof Error ? err.message : "Failed to load certificate");
+        setPdfBlobUrl(null);
+      })
+      .finally(() => setPdfLoading(false));
+
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
   }, [completedOrg]);
 
   if (!completedOrg) return null;
 
-  const certUrl = `/api/onboarding/certificate?orgId=${encodeURIComponent(completedOrg.id)}`;
-
   const onPrint = () => {
-    const win = window.open(certUrl, "_blank");
-    if (win) {
-      win.addEventListener("load", () => {
-        setTimeout(() => win.print(), 500);
-      });
+    if (pdfBlobUrl) {
+      const win = window.open(pdfBlobUrl, "_blank");
+      if (win) {
+        win.addEventListener("load", () => {
+          setTimeout(() => win.print(), 500);
+        });
+      }
+    } else {
+      toast.error("Certificate not loaded yet");
     }
   };
 
   const onDownload = () => {
-    toast.info("Preparing PDF download...");
-    const link = document.createElement("a");
-    link.href = certUrl;
-    link.download = `${completedOrg.id}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("PDF download started");
+    if (pdfBlobUrl) {
+      toast.info("Preparing PDF download...");
+      const link = document.createElement("a");
+      link.href = pdfBlobUrl;
+      link.download = `${completedOrg.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("PDF download started");
+    } else {
+      toast.error("Certificate not loaded yet");
+    }
   };
 
   const onEmail = () => {
@@ -72,7 +103,7 @@ export default function OnboardingConfirmationPage() {
   return (
     <div className="space-y-6 print:space-y-4">
       {/* ── Congratulations Banner ── */}
-      <div className="rounded-lg border border-success/30 bg-success/10 p-6 text-center">
+      <div className="rounded-xl border border-success/30 bg-success/10 p-6 text-center">
         <PartyPopper className="mx-auto mb-3 h-10 w-10 text-success" />
         <h2 className="text-xl font-bold text-foreground">
           Congratulations!
@@ -92,7 +123,7 @@ export default function OnboardingConfirmationPage() {
       </div>
 
       {/* ── PDF Preview ── */}
-      <div className="overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-2.5">
           <FileText size={16} className="text-primary" />
           <span className="text-sm font-semibold text-foreground">
@@ -105,9 +136,14 @@ export default function OnboardingConfirmationPage() {
           <div className="flex h-[500px] items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
-        ) : pdfUrl ? (
+        ) : pdfError ? (
+          <div className="flex h-[500px] flex-col items-center justify-center gap-2 px-4 text-center text-sm text-muted-foreground">
+            <FileText className="h-10 w-10 text-muted-foreground/50" />
+            <p>{pdfError}</p>
+          </div>
+        ) : pdfBlobUrl ? (
           <iframe
-            src={pdfUrl}
+            src={pdfBlobUrl}
             className="h-[500px] w-full border-0"
             title="Registration Certificate PDF"
           />
@@ -119,7 +155,7 @@ export default function OnboardingConfirmationPage() {
       </div>
 
       {/* ── Action Buttons ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-6 py-4 shadow-lg print:hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-6 py-4 shadow-sm print:hidden">
         <div className="flex gap-2">
           <SxButton
             type="button"

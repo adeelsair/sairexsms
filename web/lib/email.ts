@@ -43,6 +43,26 @@ export async function sendEmail(opts: {
 }
 
 /**
+ * Send OTP verification code email. Used by onboarding verify/send and OTP worker.
+ */
+export async function sendOtpEmail(to: string, code: string): Promise<boolean> {
+  return sendEmail({
+    to,
+    subject: "Your verification code — SAIREX SMS",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2 style="color: #1e40af;">SAIREX SMS</h2>
+        <p>Your verification code is:</p>
+        <p style="font-size: 32px; font-weight: bold; letter-spacing: 8px; margin: 24px 0; color: #1e40af;">${code}</p>
+        <p style="color: #64748b; font-size: 14px;">
+          This code expires in 10 minutes. If you didn't request this, ignore this message.
+        </p>
+      </div>
+    `,
+  });
+}
+
+/**
  * Send email verification link to a newly registered user.
  */
 export async function sendVerificationEmail(

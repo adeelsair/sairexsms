@@ -1,16 +1,17 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Save, Upload, X, FileText, Eye } from "lucide-react";
+import { ArrowLeft, ArrowRight, Save, Upload, X, FileText, Eye, Info } from "lucide-react";
 
 import {
   onboardingLegalSchema,
   type OnboardingLegalInput,
 } from "@/lib/validations/onboarding";
+import { api } from "@/lib/api-client";
 import { useOnboarding } from "../context";
 
 import { SxButton } from "@/components/sx";
@@ -23,6 +24,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const ACCEPTED_TYPES = [
   "application/pdf",
@@ -96,15 +103,16 @@ function CertUploadBtn({ onUpload, hasFile }: CertUploadBtnProps) {
 
   return (
     <>
-      <button
+      <SxButton
         type="button"
-        className="flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border px-3 text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/5 hover:text-primary"
+        sxVariant="outline"
+        className="h-9 w-full border-dashed text-xs text-muted-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-primary"
         onClick={() => inputRef.current?.click()}
         title="Upload PDF, JPG, or PNG (max 2 MB)"
+        icon={<Upload size={14} />}
       >
-        <Upload size={14} />
         {hasFile ? "Replace" : "Upload"}
-      </button>
+      </SxButton>
       <input
         ref={inputRef}
         type="file"
@@ -181,7 +189,7 @@ function CertPreview({ label, fileName, dataUrl, onRemove }: CertPreviewProps) {
 
 export default function OnboardingLegalPage() {
   const router = useRouter();
-  const { draft, saveStep, markValidated } = useOnboarding();
+  const { draft, saveStep, markValidated, clearStepValidated } = useOnboarding();
 
   const form = useForm<OnboardingLegalInput>({
     resolver: zodResolver(onboardingLegalSchema),
@@ -196,7 +204,8 @@ export default function OnboardingLegalPage() {
     },
   });
 
-  const { handleSubmit, setValue, watch } = form;
+  const { handleSubmit, setValue, watch, setError, getValues } = form;
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const regCertName = watch("registrationCertName");
   const regCertData = watch("registrationCertificate");
@@ -210,18 +219,40 @@ export default function OnboardingLegalPage() {
 
   const onSave = (data: OnboardingLegalInput) => {
     saveStep("legal", data);
-    markValidated("legal");
     toast.success("Registration information saved");
   };
 
-  const onNext = (data: OnboardingLegalInput) => {
-    saveStep("legal", data);
+  const onNext = async (_data: OnboardingLegalInput) => {
+    const current = getValues();
+    const organizationName = draft.identity?.organizationName ?? "";
+    setIsVerifying(true);
+    setError("taxNumber", { message: undefined });
+    setError("ntnCertificate", { message: undefined });
+
+    const result = await api.post<{ ok: boolean }>("/api/onboarding/verify-ntn", {
+      ntnCertificate: current.ntnCertificate,
+      taxNumber: current.taxNumber,
+      organizationName,
+    });
+    setIsVerifying(false);
+
+    const httpOk = result.ok === true;
+    const bodyOk = httpOk && "data" in result && result.data?.ok === true;
+    if (!bodyOk) {
+      const message = !httpOk && "error" in result ? result.error : "Certificate verification failed.";
+      toast.error(message);
+      setError("taxNumber", { type: "manual", message });
+      setError("ntnCertificate", { type: "manual", message });
+      return;
+    }
+
+    saveStep("legal", current);
     markValidated("legal");
     router.push("/onboarding/contact-address");
   };
 
   return (
-    <div className="rounded-lg border border-border bg-card p-8 shadow-lg">
+    <div className="rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
       <h2 className="mb-1 text-xl font-semibold text-foreground">
         Registration Information
       </h2>
@@ -231,7 +262,10 @@ export default function OnboardingLegalPage() {
       </p>
 
       <Form {...form}>
-        <form className="space-y-5">
+        <form
+          className="space-y-5"
+          onSubmit={(e) => e.preventDefault()}
+        >
           <div className="grid grid-cols-2 gap-6">
             {/* ── Left: Fields + Upload Buttons ── */}
             <div className="space-y-5">
@@ -241,7 +275,24 @@ export default function OnboardingLegalPage() {
                   name="registrationNumber"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Registration Number</FormLabel>
+                      <FormLabel className="flex items-center gap-1.5">
+                        Registration Number
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex cursor-help text-muted-foreground hover:text-foreground">
+                                <Info className="size-4" aria-hidden />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs p-3 text-xs">
+                              <p className="font-medium">Registration number</p>
+                              <p className="mt-1 opacity-90">
+                                Official registration number from the relevant authority. Enter N/A if not registered.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormLabel>
                       <FormControl>
                         <Input placeholder="e.g. REG-12345 or N/A" {...field} />
                       </FormControl>
@@ -250,7 +301,24 @@ export default function OnboardingLegalPage() {
                   )}
                 />
                 <div className="space-y-1.5">
-                  <p className="text-sm font-medium text-foreground">Registration Certificate</p>
+                  <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                    Reg. Certificate
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex cursor-help text-muted-foreground hover:text-foreground">
+                            <Info className="size-4" aria-hidden />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs p-3 text-xs">
+                          <p className="font-medium">Registration certificate</p>
+                          <p className="mt-1 opacity-90">
+                            Optional. Upload a copy of your official registration certificate (PDF, JPG, or PNG).
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </p>
                   <CertUploadBtn
                     hasFile={!!regCertName}
                     onUpload={(url, name) => {
@@ -267,31 +335,87 @@ export default function OnboardingLegalPage() {
                   name="taxNumber"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Tax / NTN Number</FormLabel>
+                      <FormLabel className="flex items-center gap-1.5">
+                        Tax / NTN Number
+                        <TooltipProvider>
+                          <Tooltip
+                            open={!!form.formState.errors.taxNumber}
+                            onOpenChange={() => {}}
+                          >
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex cursor-help text-muted-foreground hover:text-foreground">
+                                <Info className="size-4" aria-hidden />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs p-3 text-xs">
+                              <p className="font-medium">NTN format</p>
+                              <ul className="mt-1.5 list-inside list-disc space-y-0.5 opacity-90">
+                                <li>7 digits (business)</li>
+                                <li>8 digits (individual)</li>
+                                <li>7 digits + hyphen + 1 check digit (e.g. 1234567-8)</li>
+                              </ul>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. 1234567-8 or N/A" {...field} />
+                        <Input
+                          placeholder="e.g. 1234567 or 1234567-8"
+                          className="bg-background text-foreground placeholder:text-foreground/70"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            clearStepValidated("legal");
+                          }}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="ntnCertificate"
+                  render={() => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                        NTN Certificate
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex cursor-help text-muted-foreground hover:text-foreground">
+                                <Info className="size-4" aria-hidden />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs p-3 text-xs">
+                              <p className="font-medium">NTN certificate</p>
+                              <p className="mt-1 opacity-90">
+                                Upload a PDF. The certificate must contain the same NTN number as entered above.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </FormLabel>
+                      <FormControl>
+                        <CertUploadBtn
+                          hasFile={!!ntnCertName}
+                          onUpload={(url, name) => {
+                            setValue("ntnCertificate", url, { shouldDirty: true, shouldValidate: true });
+                            setValue("ntnCertName", name, { shouldDirty: true, shouldValidate: true });
+                            clearStepValidated("legal");
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <div className="space-y-1.5">
-                  <p className="text-sm font-medium text-foreground">NTN Certificate</p>
-                  <CertUploadBtn
-                    hasFile={!!ntnCertName}
-                    onUpload={(url, name) => {
-                      setValue("ntnCertificate", url);
-                      setValue("ntnCertName", name);
-                    }}
-                  />
-                </div>
               </div>
             </div>
 
             {/* ── Right: Previews Side by Side ── */}
             <div className="flex gap-3">
               <CertPreview
-                label="Registration Certificate"
+                label="Reg. Certificate"
                 fileName={regCertName || undefined}
                 dataUrl={regCertData || undefined}
                 onRemove={() => {
@@ -304,8 +428,9 @@ export default function OnboardingLegalPage() {
                 fileName={ntnCertName || undefined}
                 dataUrl={ntnCertData || undefined}
                 onRemove={() => {
-                  setValue("ntnCertificate", "");
-                  setValue("ntnCertName", "");
+                  setValue("ntnCertificate", "", { shouldDirty: true, shouldValidate: true });
+                  setValue("ntnCertName", "", { shouldDirty: true, shouldValidate: true });
+                  clearStepValidated("legal");
                 }}
               />
             </div>
@@ -316,7 +441,24 @@ export default function OnboardingLegalPage() {
             name="establishedDate"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Established Date</FormLabel>
+                <FormLabel className="flex items-center gap-1.5">
+                  Established Date
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex cursor-help text-muted-foreground hover:text-foreground">
+                          <Info className="size-4" aria-hidden />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs p-3 text-xs">
+                        <p className="font-medium">Established date</p>
+                        <p className="mt-1 opacity-90">
+                          Date when the organization was established or incorporated.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </FormLabel>
                 <FormControl>
                   <Input type="date" max={new Date().toISOString().split("T")[0]} {...field} />
                 </FormControl>
@@ -349,8 +491,9 @@ export default function OnboardingLegalPage() {
                 sxVariant="primary"
                 icon={<ArrowRight size={16} />}
                 onClick={handleSubmit(onNext)}
+                disabled={isVerifying}
               >
-                Next
+                {isVerifying ? "Verifying…" : "Next"}
               </SxButton>
             </div>
           </div>

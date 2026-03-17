@@ -7,6 +7,10 @@ export const redis = new IORedis(redisUrl, {
   enableReadyCheck: true,
 });
 
+redis.on("error", (err) => {
+  console.warn("[Payment API] Redis connection issue:", err.message);
+});
+
 export function createWorkerRedis() {
   return new IORedis(redisUrl, {
     maxRetriesPerRequest: null,

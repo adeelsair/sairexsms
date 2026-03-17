@@ -1,5 +1,9 @@
 {
+  "scripts": {
+    "dev:payment-api": "tsx apps/api/src/server.ts"
+  },
   "devDependencies": {
+    "tsx": "^4.19.2",
     "@types/express": "^5.0.6",
     "@types/node": "^25.2.2",
     "prisma": "5.22.0"

@@ -12,14 +12,14 @@ interface QuickActionsPanelProps {
 const ACTIONS: Record<string, QuickAction[]> = {
   CAMPUS_ADMIN: [
     { label: "Mark Attendance", href: "/admin/attendance" },
-    { label: "Collect Fee", href: "/admin/payments" },
+    { label: "Collect Fee", href: "/admin/payment-gateway?tab=manual-collection" },
     { label: "New Admission", href: "/admin/enrollments" },
     { label: "Send Notice", href: "/admin/jobs" },
     { label: "Print Challan", href: "/admin/finance?tab=challans" },
   ],
   ACCOUNTANT: [
-    { label: "Collect Fee", href: "/admin/payments" },
-    { label: "Verify Payments", href: "/admin/payments" },
+    { label: "Collect Fee", href: "/admin/payment-gateway?tab=manual-collection" },
+    { label: "Verify Payments", href: "/admin/payment-gateway?tab=manual-collection" },
     { label: "Generate Challans", href: "/admin/finance?tab=challans" },
     { label: "Add Expense", href: "/admin/finance" },
   ],

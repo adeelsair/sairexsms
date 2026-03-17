@@ -86,6 +86,7 @@ interface OnboardingContextValue {
   ready: boolean;
   saveStep: <K extends StepKey>(step: K, value: OnboardingDraft[K]) => void;
   markValidated: (step: StepKey) => void;
+  clearStepValidated: (step: StepKey) => void;
   isStepValidated: (step: StepKey) => boolean;
   setCompletedOrg: (org: CompletedOrg) => void;
   markFieldVerified: (field: VerifiableField, value: string, channel: string, verifiedAt?: string) => void;
@@ -172,6 +173,13 @@ export function OnboardingProvider({ children, userEmail }: { children: ReactNod
     }));
   }, []);
 
+  const clearStepValidated = useCallback((step: StepKey) => {
+    setDraft((prev) => ({
+      ...prev,
+      validatedSteps: prev.validatedSteps.filter((s) => s !== step),
+    }));
+  }, []);
+
   const isStepValidated = useCallback(
     (step: StepKey) => draft.validatedSteps.includes(step),
     [draft.validatedSteps],
@@ -214,6 +222,7 @@ export function OnboardingProvider({ children, userEmail }: { children: ReactNod
         ready,
         saveStep,
         markValidated,
+        clearStepValidated,
         isStepValidated,
         setCompletedOrg,
         markFieldVerified,

@@ -59,7 +59,7 @@ async function main() {
 
       // Legal
       registrationNumber: "N/A",
-      taxNumber: "N/A",
+      taxNumber: "1234567",
       establishedDate: new Date("2024-01-01"),
 
       // HQ Address

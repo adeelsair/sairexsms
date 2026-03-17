@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -11,7 +11,7 @@ import { api } from "@/lib/api-client";
 import {
   providerCheckSchema,
   type ProviderCheckInput,
-} from "@/lib/validations/payment-engine";
+} from "@/lib/validations/payment-gateway";
 import {
   SxPageHeader,
   SxButton,
@@ -171,7 +171,7 @@ function statusVariant(value: "PASS" | "WARN" | "FAIL") {
   return "destructive";
 }
 
-export default function PaymentEnginePage() {
+export default function PaymentGatewayPage() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState<AnalyticsPayload | null>(null);
@@ -183,6 +183,8 @@ export default function PaymentEnginePage() {
   const [reconciliation, setReconciliation] = useState<ReconciliationPayload | null>(null);
   const [providerReport, setProviderReport] = useState<ProviderCheckResponse | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [apiUnavailable, setApiUnavailable] = useState(false);
+  const hasShownApiUnavailableToast = useRef(false);
 
   const form = useForm<ProviderCheckInput>({
     resolver: zodResolver(providerCheckSchema),
@@ -206,6 +208,7 @@ export default function PaymentEnginePage() {
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
+    setApiUnavailable(false);
     const [
       analyticsRes,
       queueRes,
@@ -234,10 +237,24 @@ export default function PaymentEnginePage() {
       reconciliationRes,
     ];
     const firstError = responses.find((entry) => !entry.ok);
-    if (firstError && !firstError.ok) {
+    const isConnectionError =
+      firstError &&
+      !firstError.ok &&
+      (firstError.status === 0 ||
+        firstError.status === 404 ||
+        /ECONNREFUSED|fetch failed|Network error/i.test(firstError.error ?? ""));
+
+    if (isConnectionError) {
+      setApiUnavailable(true);
+      if (!hasShownApiUnavailableToast.current) {
+        hasShownApiUnavailableToast.current = true;
+        toast.warning(
+          "Payment API is not running. Start it from the repo root: npm run dev:payment-api — Manual Collection still works.",
+          { duration: 8000 },
+        );
+      }
+    } else if (firstError && !firstError.ok) {
       toast.error(firstError.error);
-      setLoading(false);
-      return;
     }
 
     if (analyticsRes.ok) setAnalytics(analyticsRes.data);
@@ -281,7 +298,7 @@ export default function PaymentEnginePage() {
   return (
     <div className="space-y-6">
       <SxPageHeader
-        title="Payment Engine"
+        title="Payment Gateway"
         subtitle="Operational dashboard for payment rails, queue health, and provider diagnostics."
         actions={
           <div className="flex items-center gap-2">
@@ -295,6 +312,12 @@ export default function PaymentEnginePage() {
           </div>
         }
       />
+
+      {apiUnavailable && (
+        <div className="rounded-xl border border-warning/50 bg-warning/10 px-4 py-3 text-sm text-warning-foreground">
+          <strong>Payment API not running.</strong> Overview, Provider Checks, and Operations need the API. Manual Collection works without it. From repo root run: <code className="rounded bg-muted px-1.5 py-0.5 text-xs">npm run dev:payment-api</code>
+        </div>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>

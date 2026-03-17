@@ -35,9 +35,6 @@ export function ModeToggleButton(props: { currentMode: "SIMPLE" | "PRO" }) {
     setMode(result.data.mode);
     toast.success(result.data.mode === "PRO" ? "Pro mode enabled" : "Simple mode enabled");
     router.refresh();
-    if (result.data.mode === "SIMPLE") {
-      router.push("/mobile/dashboard");
-    }
   }
 
   return (

@@ -58,9 +58,12 @@ export const onboardingLegalSchema = z.object({
 
   taxNumber: z
     .string()
-    .min(1, "Tax number is required (enter N/A if not applicable)")
-    .max(50, "Tax number must not exceed 50 characters")
-    .transform(normalizeString),
+    .min(1, "NTN / Tax number is required (FBR Pakistan)")
+    .transform((v) => v.trim().replace(/\s+/g, ""))
+    .refine(
+      (v) => /^\d{7}$|^\d{8}$|^\d{7}-\d$/.test(v),
+      "NTN must follow FBR format: 7 digits (business), 8 digits (individual), or 7 digits hyphen 1 check digit (e.g. 1234567 or 1234567-8)"
+    ),
 
   establishedDate: z
     .string()
@@ -69,8 +72,12 @@ export const onboardingLegalSchema = z.object({
 
   registrationCertificate: z.string().optional().or(z.literal("")),
   registrationCertName: z.string().optional().or(z.literal("")),
-  ntnCertificate: z.string().optional().or(z.literal("")),
-  ntnCertName: z.string().optional().or(z.literal("")),
+  ntnCertificate: z
+    .string()
+    .min(1, "NTN certificate upload is required"),
+  ntnCertName: z
+    .string()
+    .min(1, "NTN certificate file is required"),
 });
 
 export type OnboardingLegalInput = z.input<typeof onboardingLegalSchema>;
@@ -158,6 +165,11 @@ export type OnboardingContactAddressData = z.output<typeof onboardingContactAddr
 
 // ─── Step 4: Branding ───────────────────────────────────────────────────────
 
+export const onboardingBrandingLogoVariantSchema = z.object({
+  variant: z.string(),
+  url: z.string(),
+});
+
 export const onboardingBrandingSchema = z.object({
   logoUrl: z
     .string()
@@ -170,6 +182,8 @@ export const onboardingBrandingSchema = z.object({
     .url("Must be a valid URL")
     .optional()
     .or(z.literal("")),
+
+  logoVariants: z.array(onboardingBrandingLogoVariantSchema).optional().default([]),
 });
 
 export type OnboardingBrandingInput = z.input<typeof onboardingBrandingSchema>;

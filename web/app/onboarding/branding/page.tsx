@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -64,7 +64,7 @@ export default function OnboardingBrandingPage() {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [uploadedVariants, setUploadedVariants] = useState<UploadedVariant[]>(
-    [],
+    draft.branding?.logoVariants ?? [],
   );
 
   const form = useForm<OnboardingBrandingInput>({
@@ -72,10 +72,19 @@ export default function OnboardingBrandingPage() {
     defaultValues: draft.branding ?? {
       logoUrl: "",
       websiteUrl: "",
+      logoVariants: [],
     },
   });
 
   const { handleSubmit } = form;
+
+  // Restore logo preview and variants when draft loads (e.g. after navigating back)
+  useEffect(() => {
+    const b = draft.branding;
+    if (!b) return;
+    if (b.logoUrl) setPreview(b.logoUrl);
+    if (b.logoVariants && b.logoVariants.length > 0) setUploadedVariants(b.logoVariants);
+  }, [draft.branding?.logoUrl, draft.branding?.logoVariants]);
 
   const handleFile = async (file: File) => {
     if (!ACCEPTED_IMAGE.includes(file.type)) {
@@ -137,24 +146,24 @@ export default function OnboardingBrandingPage() {
   };
 
   const onBack = () => {
-    saveStep("branding", form.getValues());
+    saveStep("branding", { ...form.getValues(), logoVariants: uploadedVariants });
     router.push("/onboarding/contact-address");
   };
 
   const onSave = (data: OnboardingBrandingInput) => {
-    saveStep("branding", data);
+    saveStep("branding", { ...data, logoVariants: uploadedVariants });
     markValidated("branding");
     toast.success("Branding saved");
   };
 
   const onNext = (data: OnboardingBrandingInput) => {
-    saveStep("branding", data);
+    saveStep("branding", { ...data, logoVariants: uploadedVariants });
     markValidated("branding");
     router.push("/onboarding/preview");
   };
 
   return (
-    <div className="rounded-lg border border-border bg-card p-8 shadow-lg">
+    <div className="rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
       <div className="mb-6 text-center">
         <Palette className="mx-auto mb-3 h-10 w-10 text-primary" />
         <h2 className="mb-1 text-xl font-semibold text-foreground">
@@ -177,7 +186,7 @@ export default function OnboardingBrandingPage() {
                 <FormItem>
                   <FormLabel>Organization Logo (Optional)</FormLabel>
                   <FormControl>
-                    <div>
+                    <div className="flex flex-col gap-4 rounded-lg border border-border bg-muted/30 p-4">
                       <input
                         ref={fileRef}
                         type="file"
@@ -189,9 +198,41 @@ export default function OnboardingBrandingPage() {
                         }}
                       />
 
-                      {preview ? (
-                        <div className="space-y-3">
-                          <div className="relative flex flex-col items-center gap-3 rounded-lg border border-border bg-muted/30 p-4">
+                      {/* Row 1: Buttons left, preview/drop right */}
+                      <div className="flex gap-4">
+                        <div className="flex flex-col gap-2 shrink-0">
+                          <SxButton
+                            type="button"
+                            sxVariant="outline"
+                            size="sm"
+                            icon={
+                              uploading ? (
+                                <Loader2 size={14} className="animate-spin" />
+                              ) : (
+                                <Upload size={14} />
+                              )
+                            }
+                            onClick={() => fileRef.current?.click()}
+                            disabled={uploading}
+                          >
+                            {preview ? "Replace" : "Add logo"}
+                          </SxButton>
+                          {preview && (
+                            <SxButton
+                              type="button"
+                              sxVariant="ghost"
+                              size="sm"
+                              icon={<X size={14} />}
+                              onClick={removeLogo}
+                              disabled={uploading}
+                            >
+                              Remove
+                            </SxButton>
+                          )}
+                        </div>
+
+                        {preview ? (
+                          <div className="flex min-w-0 flex-1 items-center gap-3">
                             <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
@@ -200,7 +241,7 @@ export default function OnboardingBrandingPage() {
                                 className="h-full w-full object-contain"
                               />
                             </div>
-                            <div className="text-center">
+                            <div>
                               <p className="text-sm font-medium text-foreground">
                                 Logo uploaded
                               </p>
@@ -210,90 +251,63 @@ export default function OnboardingBrandingPage() {
                                   : "You can replace or remove it"}
                               </p>
                             </div>
-                            <div className="flex gap-2">
-                              <SxButton
-                                type="button"
-                                sxVariant="outline"
-                                size="sm"
-                                icon={
-                                  uploading ? (
-                                    <Loader2 size={14} className="animate-spin" />
-                                  ) : (
-                                    <Upload size={14} />
-                                  )
-                                }
-                                onClick={() => fileRef.current?.click()}
-                                disabled={uploading}
-                              >
-                                Replace
-                              </SxButton>
-                              <SxButton
-                                type="button"
-                                sxVariant="ghost"
-                                size="sm"
-                                icon={<X size={14} />}
-                                onClick={removeLogo}
-                                disabled={uploading}
-                              >
-                                Remove
-                              </SxButton>
-                            </div>
                           </div>
+                        ) : (
+                          <div
+                            className={`flex min-h-24 flex-1 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 transition-colors ${
+                              dragOver
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-primary/50 hover:bg-muted/30"
+                            }`}
+                            onClick={() => fileRef.current?.click()}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              setDragOver(true);
+                            }}
+                            onDragLeave={() => setDragOver(false)}
+                            onDrop={onDrop}
+                          >
+                            {uploading ? (
+                              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                            ) : (
+                              <ImageIcon className="h-10 w-10 text-muted-foreground/50" />
+                            )}
+                            <p className="text-sm font-medium text-foreground">
+                              {uploading
+                                ? "Processing & optimizing..."
+                                : "Click or drag & drop to upload"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              PNG, JPG, WEBP, or SVG — Min 128×128 — Max 5 MB
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">
+                              Auto-converted to WEBP with SM, MD, LG variants
+                            </p>
+                          </div>
+                        )}
+                      </div>
 
-                          {uploadedVariants.length > 0 && (
-                            <div className="flex flex-wrap gap-3 rounded-lg border border-border bg-muted/20 p-3">
-                              {uploadedVariants.map((v) => (
-                                <div
-                                  key={v.variant}
-                                  className="flex flex-col items-center gap-1"
-                                >
-                                  <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded border border-border bg-background">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                      src={v.url}
-                                      alt={`${v.variant} variant`}
-                                      className="h-full w-full object-contain"
-                                    />
-                                  </div>
-                                  <span className="text-[10px] font-medium uppercase text-muted-foreground">
-                                    {v.variant}
-                                  </span>
-                                </div>
-                              ))}
+                      {/* Row 2: Full-width variants (including under buttons) */}
+                      {preview && uploadedVariants.length > 0 && (
+                        <div className="grid w-full grid-cols-4 gap-3">
+                          {uploadedVariants.map((v) => (
+                            <div
+                              key={v.variant}
+                              className="flex flex-col items-center gap-1.5"
+                            >
+                              <div className="flex h-14 w-full min-w-0 items-center justify-center overflow-hidden rounded border border-border bg-background">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={v.url}
+                                  alt={`${v.variant} variant`}
+                                  className="max-h-14 w-full object-contain"
+                                />
+                              </div>
+                              <span className="text-[10px] font-medium uppercase text-muted-foreground">
+                                {v.variant}
+                              </span>
                             </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div
-                          className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-8 transition-colors ${
-                            dragOver
-                              ? "border-primary bg-primary/5"
-                              : "border-border hover:border-primary/50 hover:bg-muted/30"
-                          }`}
-                          onClick={() => fileRef.current?.click()}
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            setDragOver(true);
-                          }}
-                          onDragLeave={() => setDragOver(false)}
-                          onDrop={onDrop}
-                        >
-                          {uploading ? (
-                            <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                          ) : (
-                            <ImageIcon className="h-10 w-10 text-muted-foreground/50" />
-                          )}
-                          <p className="text-sm font-medium text-foreground">
-                            {uploading
-                              ? "Processing & optimizing..."
-                              : "Click or drag & drop to upload"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            PNG, JPG, WEBP, or SVG — Min 128×128 — Max 5 MB
-                          </p>
-                          <p className="text-[10px] text-muted-foreground">
-                            Auto-converted to WEBP with SM, MD, LG variants
-                          </p>
+                          ))}
                         </div>
                       )}
                     </div>

@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireVerifiedAuth } from "@/lib/auth-guard";
 import { onboardingLegalSchema } from "@/lib/validations/onboarding";
+import { verifyNtnCertificate } from "@/lib/onboarding/verify-ntn-cert";
 
 /**
  * POST /api/onboarding/legal
  *
  * Step 2: Updates the Organization with legal information.
+ * Requires NTN certificate upload and verifies it contains the entered NTN and organization name.
  * Advances onboardingStep from ORG_IDENTITY → LEGAL.
  */
 export async function POST(request: Request) {
@@ -41,6 +43,29 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json(
         { errors: parsed.error.flatten().fieldErrors },
+        { status: 400 },
+      );
+    }
+
+    const organizationName =
+      org.organizationName?.trim() || "";
+    const verify = await verifyNtnCertificate(
+      parsed.data.ntnCertificate,
+      parsed.data.taxNumber,
+      organizationName,
+    );
+
+    if (!verify.ok) {
+      return NextResponse.json(
+        {
+          error: verify.message,
+          fieldErrors:
+            verify.error === "ntn_mismatch"
+              ? { taxNumber: [verify.message] }
+              : verify.error === "org_name_mismatch"
+                ? { ntnCertificate: [verify.message] }
+                : { ntnCertificate: [verify.message] },
+        },
         { status: 400 },
       );
     }

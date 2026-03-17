@@ -5,9 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { SxButton } from "@/components/sx";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api-client";
 import { usePublicOnboardingDraft } from "@/lib/hooks/usePublicOnboardingDraft";
 
@@ -57,27 +55,30 @@ export default function FeeSetupPage() {
     router.push("/onboarding/admin-create");
   }
 
+  const authInputClass = "bg-background text-foreground placeholder:text-foreground/70";
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Fee Setup (Simple Mode)</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label>Average Monthly Fee (PKR)</Label>
+    <div className="rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
+      <h2 className="mb-1 text-xl font-semibold text-foreground">Fee Setup (Simple Mode)</h2>
+      <p className="mb-6 text-sm text-muted-foreground">
+        We&apos;ll auto-create a standard monthly tuition plan. You can fine-tune details later from admin settings.
+      </p>
+
+      <div className="space-y-4">
+        <div>
+          <label htmlFor="averageMonthlyFee" className="mb-1.5 block text-sm font-medium text-foreground">
+            Average Monthly Fee (PKR)
+          </label>
           <Input
+            id="averageMonthlyFee"
             type="number"
             min={100}
             step={100}
             value={averageMonthlyFee}
             onChange={(e) => setAverageMonthlyFee(e.target.value)}
+            className={authInputClass}
           />
         </div>
-
-        <p className="text-xs text-muted-foreground">
-          We&apos;ll auto-create a standard monthly tuition plan. You can fine-tune
-          details later from admin settings.
-        </p>
 
         <div className="flex gap-2">
           <SxButton sxVariant="secondary" className="w-full" onClick={() => router.back()}>
@@ -87,7 +88,7 @@ export default function FeeSetupPage() {
             Continue
           </SxButton>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

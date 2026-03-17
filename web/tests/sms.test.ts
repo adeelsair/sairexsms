@@ -30,8 +30,6 @@ describe("sendSmsMessage", () => {
     delete process.env.VEEVO_SENDER;
     delete process.env.VEEVO_LOGIN_ID;
     delete process.env.VEEVO_PASSWORD;
-    delete process.env.ANDROID_SMS_GATEWAY_URL;
-    delete process.env.ANDROID_SMS_GATEWAY_TOKEN;
     delete process.env.SMSMOBILE_API_KEY;
     delete process.env.SMSMOBILE_API_URL;
     delete process.env.SMSMOBILE_SEND_WA;
@@ -50,56 +48,35 @@ describe("sendSmsMessage", () => {
     expect(mockedAxios.get).not.toHaveBeenCalled();
   });
 
-  it("calls provider endpoint when credentials are configured", async () => {
+  it("calls Veevo v3 endpoint when credentials are configured", async () => {
     process.env.VEEVO_HASH = "hash";
     process.env.VEEVO_SENDER = "sender";
-    mockedAxios.get.mockResolvedValue({ status: 200, data: { STATUS: "SUCCESS" } } as never);
+    mockedAxios.post.mockResolvedValue({ status: 200, data: { STATUS: "SUCCESSFUL" } } as never);
 
     await sendSmsMessage("03001234567", "Hi");
 
-    expect(mockedAxios.get).toHaveBeenCalledOnce();
-    expect(mockedAxios.get.mock.calls[0]?.[0]).toContain("receivenum=923001234567");
-  });
-
-  it("throws when provider reports FAILED in object response", async () => {
-    process.env.VEEVO_HASH = "hash";
-    process.env.VEEVO_SENDER = "sender";
-    mockedAxios.get.mockResolvedValue({ status: 200, data: { STATUS: "FAILED" } } as never);
-
-    await expect(sendSmsMessage("03001234567", "Hi")).rejects.toThrow("Veevo SMS failed");
-  });
-
-  it("throws when provider reports FAILED in string response", async () => {
-    process.env.VEEVO_HASH = "hash";
-    process.env.VEEVO_SENDER = "sender";
-    mockedAxios.get.mockResolvedValue({ status: 200, data: "FAILED: invalid sender" } as never);
-
-    await expect(sendSmsMessage("03001234567", "Hi")).rejects.toThrow("Veevo SMS failed");
-  });
-
-  it("throws when android gateway url is missing", async () => {
-    process.env.SMS_PROVIDER = "android_gateway";
-    await expect(sendSmsMessage("03001234567", "Hi")).rejects.toThrow(
-      "ANDROID_SMS_GATEWAY_URL is missing",
-    );
-  });
-
-  it("calls android gateway endpoint when configured", async () => {
-    process.env.SMS_PROVIDER = "android_gateway";
-    process.env.ANDROID_SMS_GATEWAY_URL = "https://phone-gateway.local/send";
-    process.env.ANDROID_SMS_GATEWAY_TOKEN = "token";
-    mockedAxios.post.mockResolvedValue({ status: 200, data: { status: "ok" } } as never);
-
-    await sendSmsMessage("03001234567", "Hi from gateway");
-
     expect(mockedAxios.post).toHaveBeenCalledOnce();
     expect(mockedAxios.post).toHaveBeenCalledWith(
-      "https://phone-gateway.local/send",
-      { to: "923001234567", message: "Hi from gateway" },
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: "Bearer token" }),
-      }),
+      "https://api.veevotech.com/v3/sendsms",
+      { hash: "hash", receivernum: "+923001234567", sendernum: "sender", textmessage: "Hi" },
+      expect.objectContaining({ headers: { "Content-Type": "application/json" } }),
     );
+  });
+
+  it("throws when Veevo reports FAILED in object response", async () => {
+    process.env.VEEVO_HASH = "hash";
+    process.env.VEEVO_SENDER = "sender";
+    mockedAxios.post.mockResolvedValue({ status: 200, data: { STATUS: "FAILED" } } as never);
+
+    await expect(sendSmsMessage("03001234567", "Hi")).rejects.toThrow("Veevo SMS failed");
+  });
+
+  it("throws when Veevo reports FAILED in string response", async () => {
+    process.env.VEEVO_HASH = "hash";
+    process.env.VEEVO_SENDER = "sender";
+    mockedAxios.post.mockResolvedValue({ status: 200, data: "FAILED: invalid sender" } as never);
+
+    await expect(sendSmsMessage("03001234567", "Hi")).rejects.toThrow("Veevo SMS failed");
   });
 
   it("throws when smsmobileapi key is missing", async () => {

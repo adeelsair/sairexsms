@@ -61,20 +61,22 @@ export default async function AdminLayout({
   const orgMode = user.organizationId
     ? await resolveOrganizationMode(user.organizationId)
     : { mode: "PRO" as const, isSimple: false };
-  const branding = user.organizationId
-    ? await resolveOrganizationBrandingCapabilities(user.organizationId)
-    : null;
+
+  // Sidebar brand should always use the SAIREX SMS logo.
+  const sidebarLogoUrl = "/sairex-logo.png";
+  const shouldRoundSairexLogo = true;
+
   const organizationBranding = user.organizationId
     ? await prisma.organization.findUnique({
         where: { id: user.organizationId },
         select: { logoUrl: true, displayName: true, organizationName: true },
       })
     : null;
-  const tenantLogoUrl =
-    branding?.capabilities.customLogo && organizationBranding?.logoUrl
-      ? organizationBranding.logoUrl
-      : "/sairex-logo.png";
-  const shouldRoundSairexLogo = tenantLogoUrl.startsWith("/sairex-logo");
+  // Top-bar right logo should use the organization's logo when available,
+  // otherwise fall back to the SAIREX SMS logo.
+  const topBarLogoUrl = organizationBranding?.logoUrl || "/sairex-logo.png";
+  const shouldRoundTopBarLogo = topBarLogoUrl.startsWith("/sairex-logo");
+
   const tenantName =
     organizationBranding?.displayName?.trim() ||
     organizationBranding?.organizationName?.trim() ||
@@ -116,7 +118,7 @@ export default async function AdminLayout({
       <header className="flex items-center justify-between border-b border-sidebar-border bg-sidebar px-4 py-3 md:hidden">
         <div className="flex items-center">
           <Image
-            src={tenantLogoUrl}
+            src={sidebarLogoUrl}
             alt="Tenant logo"
             width={168}
             height={44}
@@ -128,7 +130,7 @@ export default async function AdminLayout({
           groups={filteredNavigation}
           footerGroups={FOOTER_NAV_GROUPS}
           userRole={userRole}
-          tenantLogoUrl={tenantLogoUrl}
+          tenantLogoUrl={sidebarLogoUrl}
           tenantName={tenantName}
         />
       </header>
@@ -139,7 +141,7 @@ export default async function AdminLayout({
         <div className="border-b border-sidebar-border px-6 py-5">
           <div className="mb-2 w-full">
             <Image
-              src={tenantLogoUrl}
+              src={sidebarLogoUrl}
               alt="Tenant logo"
               width={320}
               height={88}
@@ -185,11 +187,11 @@ export default async function AdminLayout({
             </p>
             <div className="flex justify-end">
               <Image
-                src={tenantLogoUrl}
+                src={topBarLogoUrl}
                 alt="Tenant logo"
                 width={128}
                 height={32}
-                className={`h-8 w-auto object-contain ${shouldRoundSairexLogo ? "rounded-md" : ""}`}
+                className={`h-8 w-auto object-contain ${shouldRoundTopBarLogo ? "rounded-md" : ""}`}
               />
             </div>
           </div>

@@ -4,6 +4,9 @@ import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { requireVerifiedAuth } from "@/lib/auth-guard";
 import { enqueue, OTP_QUEUE } from "@/lib/queue";
+import { sendOtpEmail } from "@/lib/email";
+import { sendSmsMessage } from "@/lib/sms";
+import { sendWhatsAppMessage } from "@/lib/whatsapp";
 
 const CHANNELS = ["email", "mobile", "whatsapp"] as const;
 const MAX_ATTEMPTS = 5;
@@ -100,6 +103,71 @@ export async function POST(request: Request) {
       },
     });
 
+    const isDev = process.env.NODE_ENV === "development";
+
+    // In development, send email or SMS synchronously so the code is delivered without needing the OTP worker.
+    if (channel === "email" && isDev) {
+      const sent = await sendOtpEmail(target, code);
+      return NextResponse.json({
+        sent,
+        expiresInSeconds: 600,
+        maxAttempts: MAX_ATTEMPTS,
+        ...(isDev ? { devCode: code } : {}),
+      });
+    }
+
+    if (channel === "mobile" && isDev) {
+      let sent = false;
+      let smsConfigHint: string | undefined;
+      try {
+        const msg = `Your SAIREX SMS verification code is: ${code}. Valid for 10 minutes.`;
+        await sendSmsMessage(target, msg);
+        sent = true;
+      } catch (smsErr) {
+        const errMsg = smsErr instanceof Error ? smsErr.message : "";
+        if (errMsg.includes("VEEVO_HASH") || errMsg.includes("VEEVO_SENDER") || errMsg.includes("missing") || errMsg.includes("SMSMOBILE_API_KEY")) {
+          console.log(`[Verify Send] DEV — SMS not configured; code for ${target}: ${code}`);
+          smsConfigHint = "Set VEEVO_HASH and VEEVO_SENDER (or SMSMOBILE_API_KEY) in web/.env, then restart dev server.";
+        } else if (errMsg.includes("AUTH_FAILED") || errMsg.includes("Veevo SMS failed")) {
+          smsConfigHint = "Veevo credentials invalid. Check VEEVO_HASH and VEEVO_SENDER in web/.env and restart dev server.";
+        } else {
+          console.error("[Verify Send] SMS error:", smsErr);
+          smsConfigHint = "Check SMS config in web/.env and restart the dev server.";
+        }
+      }
+      return NextResponse.json({
+        sent,
+        expiresInSeconds: 600,
+        maxAttempts: MAX_ATTEMPTS,
+        ...(isDev ? { devCode: code } : {}),
+        ...(smsConfigHint ? { smsConfigHint } : {}),
+      });
+    }
+
+    if (channel === "whatsapp" && isDev) {
+      let sent = false;
+      let whatsAppConfigHint: string | undefined;
+      try {
+        await sendWhatsAppMessage(target, `Your SAIREX SMS verification code is: ${code}. Valid for 10 minutes.`);
+        sent = true;
+      } catch (waErr) {
+        const errMsg = waErr instanceof Error ? waErr.message : "";
+        console.error("[Verify Send] WhatsApp error:", waErr);
+        if (errMsg.includes("VEEVO_HASH") || errMsg.includes("required")) {
+          whatsAppConfigHint = "Set WHATSAPP_PROVIDER=veevo and VEEVO_HASH in web/.env, then restart dev server.";
+        } else {
+          whatsAppConfigHint = errMsg.length > 80 ? `WhatsApp failed. Use the code below. (${errMsg.slice(0, 80)}…)` : `WhatsApp failed: ${errMsg}`;
+        }
+      }
+      return NextResponse.json({
+        sent,
+        expiresInSeconds: 600,
+        maxAttempts: MAX_ATTEMPTS,
+        ...(isDev ? { devCode: code } : {}),
+        ...(whatsAppConfigHint ? { whatsAppConfigHint } : {}),
+      });
+    }
+
     // ── Dispatch OTP via background queue ──
     await enqueue({
       type: "OTP",
@@ -107,8 +175,6 @@ export async function POST(request: Request) {
       userId: guard.id,
       payload: { channel, target, code },
     });
-
-    const isDev = process.env.NODE_ENV === "development";
 
     return NextResponse.json({
       sent: true,

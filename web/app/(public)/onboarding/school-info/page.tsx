@@ -5,9 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { SxButton } from "@/components/sx";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -75,36 +73,63 @@ export default function SchoolInfoPage() {
     router.push("/onboarding/academic-setup");
   }
 
+  const authInputClass = "bg-background text-foreground placeholder:text-foreground/70";
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>School Basics</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label>School Name</Label>
-          <Input value={schoolName} onChange={(e) => setSchoolName(e.target.value)} />
-        </div>
+    <div className="rounded-xl border border-border bg-card p-6 shadow-sm sm:p-8">
+      <h2 className="mb-1 text-xl font-semibold text-foreground">School Basics</h2>
+      <p className="mb-6 text-sm text-muted-foreground">
+        Tell us about your school to get started.
+      </p>
 
-        <div className="space-y-2">
-          <Label>City</Label>
-          <Input value={city} onChange={(e) => setCity(e.target.value)} />
+      <div className="space-y-4">
+        <div>
+          <label htmlFor="schoolName" className="mb-1.5 block text-sm font-medium text-foreground">
+            School Name
+          </label>
+          <Input
+            id="schoolName"
+            value={schoolName}
+            onChange={(e) => setSchoolName(e.target.value)}
+            placeholder="e.g. City School"
+            className={authInputClass}
+          />
         </div>
-
-        <div className="space-y-2">
-          <Label>Contact Number</Label>
-          <Input value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} />
+        <div>
+          <label htmlFor="city" className="mb-1.5 block text-sm font-medium text-foreground">
+            City
+          </label>
+          <Input
+            id="city"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            placeholder="e.g. Lahore"
+            className={authInputClass}
+          />
         </div>
-
-        <div className="space-y-2">
-          <Label>Approx Students</Label>
+        <div>
+          <label htmlFor="contactNumber" className="mb-1.5 block text-sm font-medium text-foreground">
+            Contact Number
+          </label>
+          <Input
+            id="contactNumber"
+            value={contactNumber}
+            onChange={(e) => setContactNumber(e.target.value)}
+            placeholder="e.g. 03001234567"
+            className={authInputClass}
+          />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-foreground">
+            Approx Students
+          </label>
           <Select
             value={approxStudents}
             onValueChange={(value) =>
               setApproxStudents(value as (typeof STUDENT_OPTIONS)[number])
             }
           >
-            <SelectTrigger>
+            <SelectTrigger className={authInputClass}>
               <SelectValue placeholder="Select range" />
             </SelectTrigger>
             <SelectContent>
@@ -120,7 +145,7 @@ export default function SchoolInfoPage() {
         <SxButton sxVariant="primary" className="w-full" loading={isSaving} onClick={onContinue}>
           Continue
         </SxButton>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
