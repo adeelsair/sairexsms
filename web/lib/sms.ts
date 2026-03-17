@@ -30,6 +30,20 @@ function resolveSmsProvider(): "veevo" | "smsmobileapi" {
   return "veevo";
 }
 
+export function assertSmsConfiguredForOtp(): void {
+  if (isDryRunEnabled()) return;
+  const provider = resolveSmsProvider();
+  if (provider === "smsmobileapi") {
+    const apiKey = (process.env.SMSMOBILE_API_KEY ?? "").trim();
+    if (!apiKey) throw new Error("SMSMOBILE_API_KEY is missing");
+    return;
+  }
+  // veevo
+  const hash = process.env.VEEVO_HASH;
+  const sender = process.env.VEEVO_SENDER;
+  if (!hash || !sender) throw new Error("VEEVO_HASH or VEEVO_SENDER is missing");
+}
+
 function assertSmsProviderConfigured() {
   const hash = process.env.VEEVO_HASH;
   const sender = process.env.VEEVO_SENDER;

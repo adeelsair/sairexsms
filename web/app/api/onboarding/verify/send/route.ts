@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireVerifiedAuth } from "@/lib/auth-guard";
 import { enqueue, OTP_QUEUE } from "@/lib/queue";
 import { sendOtpEmail } from "@/lib/email";
-import { sendSmsMessage } from "@/lib/sms";
+import { assertSmsConfiguredForOtp, sendSmsMessage } from "@/lib/sms";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
 
 const CHANNELS = ["email", "mobile", "whatsapp"] as const;
@@ -104,6 +104,19 @@ export async function POST(request: Request) {
     });
 
     const isDev = process.env.NODE_ENV === "development";
+
+    // In production, fail fast if SMS/WhatsApp isn't configured.
+    if (!isDev && channel === "mobile") {
+      try {
+        assertSmsConfiguredForOtp();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "SMS is not configured";
+        return NextResponse.json(
+          { error: `SMS verification is not configured on the server (${msg}).` },
+          { status: 503 },
+        );
+      }
+    }
 
     // In development, send email or SMS synchronously so the code is delivered without needing the OTP worker.
     if (channel === "email" && isDev) {

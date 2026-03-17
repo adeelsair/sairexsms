@@ -32,6 +32,7 @@ services:
     environment:
       HOSTNAME: 0.0.0.0
       PORT: "3000"
+      NODE_ENV: production
     env_file:
       - ${SAIREX_ENV_FILE:-.env}
     depends_on:
@@ -68,6 +69,8 @@ services:
     container_name: sairex_migrate
     command: sh -lc "npx prisma@5.22.0 migrate deploy --schema /app/web/lib/generated/prisma/schema.prisma"
     restart: "no"
+    environment:
+      NODE_ENV: production
     env_file:
       - ${SAIREX_ENV_FILE:-.env}
     depends_on:
@@ -79,6 +82,8 @@ services:
     container_name: sairex_worker
     command: npm run worker
     restart: always
+    environment:
+      NODE_ENV: production
     env_file:
       - ${SAIREX_ENV_FILE:-.env}
     depends_on:
@@ -107,6 +112,8 @@ services:
     container_name: sairex_sms_worker
     command: sh -lc "cd /app && /app/web/node_modules/.bin/tsx apps/api/src/modules/notifications/queue/sms.worker.ts"
     restart: always
+    environment:
+      NODE_ENV: production
     env_file:
       - ${SAIREX_ENV_FILE:-.env}
     depends_on:
