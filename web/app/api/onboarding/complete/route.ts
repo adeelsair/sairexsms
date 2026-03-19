@@ -8,6 +8,8 @@ import { generateUnitCode, generateCityCode, buildFullUnitPath } from "@/lib/uni
 import { createUnitProfile } from "@/lib/unit-profile";
 import { bootstrapDemoDataIfEmpty } from "@/lib/bootstrap/demo-seed.service";
 import { TRIAL_POLICY, createTrialWindow } from "@/lib/billing/pricing-architecture";
+import { s3 } from "@/lib/s3";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 
 function slugify(name: string): string {
   return name
@@ -15,6 +17,73 @@ function slugify(name: string): string {
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function decodeDataUrlBase64(dataUrl: string): { mimeType: string; buffer: Buffer } | null {
+  const match = dataUrl.trim().match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  const mimeType = match[1];
+  const base64 = match[2].replace(/\s/g, "");
+  try {
+    const buffer = Buffer.from(base64, "base64");
+    if (buffer.length === 0) return null;
+    return { mimeType, buffer };
+  } catch {
+    return null;
+  }
+}
+
+function fileExtFromMime(mimeType: string): string {
+  const mt = mimeType.toLowerCase();
+  if (mt.includes("pdf")) return "pdf";
+  if (mt.includes("jpeg")) return "jpg";
+  if (mt.includes("jpg")) return "jpg";
+  if (mt.includes("png")) return "png";
+  if (mt.includes("webp")) return "webp";
+  return "bin";
+}
+
+function buildPublicUrl(key: string): string {
+  const cdnBase = process.env.NEXT_PUBLIC_CDN_URL;
+  if (cdnBase) return `${cdnBase}/${key}`;
+  return `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+}
+
+async function uploadCertificateDataUrl({
+  dataUrl,
+  key,
+}: {
+  dataUrl: string;
+  key: string;
+}): Promise<string> {
+  const hasS3 =
+    process.env.AWS_ACCESS_KEY_ID &&
+    process.env.AWS_SECRET_ACCESS_KEY &&
+    process.env.AWS_S3_BUCKET &&
+    process.env.AWS_REGION;
+
+  if (!hasS3) {
+    // Dev/no-aws mode: persist the data URL in DB so Preview works.
+    return dataUrl;
+  }
+
+  const decoded = decodeDataUrlBase64(dataUrl);
+  if (!decoded) {
+    // If it’s not a base64 data-url, fail fast.
+    throw new Error("Certificate data URL is invalid or not base64-encoded.");
+  }
+
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: process.env.AWS_S3_BUCKET!,
+      Key: key,
+      Body: decoded.buffer,
+      ContentType: decoded.mimeType,
+      CacheControl: "public, max-age=31536000, immutable",
+    }),
+  );
+
+  return buildPublicUrl(key);
 }
 
 /**
@@ -89,6 +158,32 @@ export async function POST(request: Request) {
 
     const orgId = await generateOrganizationId();
 
+    // Upload certificates before the DB transaction so we can persist their URLs.
+    // (registration certificate is optional; NTN certificate is required by schema)
+    const registrationCertDataUrl = legal.registrationCertificate || "";
+    const registrationCertName = legal.registrationCertName || null;
+    const ntnCertDataUrl = legal.ntnCertificate;
+    const ntnCertName = legal.ntnCertName || null;
+
+    const regKey =
+      registrationCertDataUrl && registrationCertDataUrl.length > 0
+        ? `organizations/${orgId}/certificates/registration.${fileExtFromMime(decodeDataUrlBase64(registrationCertDataUrl)?.mimeType ?? "application/octet-stream")}`
+        : null;
+    const ntnKey = `organizations/${orgId}/certificates/ntn.${fileExtFromMime(decodeDataUrlBase64(ntnCertDataUrl)?.mimeType ?? "application/pdf")}`;
+
+    let registrationCertificateUrl: string | null = null;
+    if (regKey && registrationCertDataUrl) {
+      registrationCertificateUrl = await uploadCertificateDataUrl({
+        dataUrl: registrationCertDataUrl,
+        key: regKey,
+      });
+    }
+
+    const ntnCertificateUrl = await uploadCertificateDataUrl({
+      dataUrl: ntnCertDataUrl,
+      key: ntnKey,
+    });
+
     const trialWindow = createTrialWindow();
     const result = await prisma.$transaction(async (tx) => {
       /* ── 1. Create Organization ─────────────────────────── */
@@ -123,7 +218,14 @@ export async function POST(request: Request) {
           organizationWhatsApp: contactAddress.organizationWhatsApp || null,
 
           websiteUrl: branding.websiteUrl || null,
+          facebookUrl: branding.facebookUrl || null,
+          instagramUrl: branding.instagramUrl || null,
           logoUrl: branding.logoUrl || null,
+
+          registrationCertificateUrl,
+          registrationCertName,
+          ntnCertificateUrl,
+          ntnCertName,
         },
       });
 

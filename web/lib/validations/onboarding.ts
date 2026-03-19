@@ -183,6 +183,18 @@ export const onboardingBrandingSchema = z.object({
     .optional()
     .or(z.literal("")),
 
+  facebookUrl: z
+    .string()
+    .url("Must be a valid URL")
+    .optional()
+    .or(z.literal("")),
+
+  instagramUrl: z
+    .string()
+    .url("Must be a valid URL")
+    .optional()
+    .or(z.literal("")),
+
   logoVariants: z.array(onboardingBrandingLogoVariantSchema).optional().default([]),
 });
 

@@ -640,6 +640,14 @@ model Organization {
   organizationMobile   String?
   organizationWhatsApp String?
   websiteUrl           String?
+  facebookUrl          String?
+  instagramUrl         String?
+
+  /// Legal certificate uploads (persisted after onboarding)
+  registrationCertificateUrl String?
+  registrationCertName       String?
+  ntnCertificateUrl           String?
+  ntnCertName                 String?
 
   /// Branding (Step 4: BRANDING — always optional)
   logoUrl       String?

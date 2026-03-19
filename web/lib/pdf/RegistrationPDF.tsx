@@ -1,6 +1,13 @@
 import React from "react";
 import { Document, Page, Text, View, Image } from "@react-pdf/renderer";
+import { z } from "zod";
 import { cert, profile } from "./styles";
+import {
+  onboardingBrandingSchema,
+  onboardingContactAddressSchema,
+  onboardingIdentitySchema,
+  onboardingLegalSchema,
+} from "@/lib/validations/onboarding";
 
 export interface OrgPdfData {
   id: string;
@@ -25,8 +32,13 @@ export interface OrgPdfData {
   organizationMobile: string | null;
   organizationWhatsApp: string | null;
   websiteUrl: string | null;
+  facebookUrl?: string | null;
+  instagramUrl?: string | null;
   logoUrl: string | null;
+  registrationCertName?: string | null;
+  ntnCertName?: string | null;
   createdAt: Date | string;
+  [key: string]: unknown;
 }
 
 function humanize(value: string | null): string {
@@ -80,13 +92,68 @@ function MonoField({ label, value }: { label: string; value: string }) {
   );
 }
 
+type SectionSchema = z.ZodObject<z.ZodRawShape>;
+
+const FIELD_LABEL_OVERRIDES: Record<string, string> = {
+  organizationPhone: "Land Line Number",
+  taxNumber: "Tax / NTN Number",
+};
+
+function getSchemaKeys(schema: SectionSchema): string[] {
+  return Object.keys(schema.shape);
+}
+
+function labelFor(fieldKey: string): string {
+  return FIELD_LABEL_OVERRIDES[fieldKey] ?? humanize(fieldKey);
+}
+
+function getFieldValue(org: OrgPdfData, fieldKey: string): string {
+  const value = org[fieldKey];
+
+  if (fieldKey === "organizationCategory" || fieldKey === "organizationStructure") {
+    return humanize(typeof value === "string" ? value : null);
+  }
+
+  if (fieldKey === "establishedDate") {
+    return fmtDate((value as Date | string | null) ?? null);
+  }
+
+  if (fieldKey === "logoUrl") {
+    return org.logoUrl ? "Uploaded" : "Not provided";
+  }
+
+  // Onboarding legal uploads are data-url fields, while persisted profile
+  // stores names/urls separately. Show a readable uploaded/not-uploaded state.
+  if (fieldKey === "registrationCertificate") {
+    return org.registrationCertName ? org.registrationCertName : "Not provided";
+  }
+  if (fieldKey === "ntnCertificate") {
+    return org.ntnCertName ? org.ntnCertName : "Not provided";
+  }
+
+  if (typeof value === "string") return fmt(value);
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "—";
+}
+
+function renderSchemaFields(org: OrgPdfData, schema: SectionSchema) {
+  return getSchemaKeys(schema).map((fieldKey) => (
+    <Field
+      key={fieldKey}
+      label={labelFor(fieldKey)}
+      value={getFieldValue(org, fieldKey)}
+    />
+  ));
+}
+
 interface PdfProps {
   org: OrgPdfData;
   qrDataUrl?: string;
   verifyUrl?: string;
+  sairexLogoDataUrl?: string;
 }
 
-export default function RegistrationPDF({ org, qrDataUrl, verifyUrl }: PdfProps) {
+export default function RegistrationPDF({ org, qrDataUrl, verifyUrl, sairexLogoDataUrl }: PdfProps) {
   const regDate = fmtDate(org.createdAt);
   const certNo = generateCertNo(org.id, org.createdAt);
   const now = new Date();
@@ -110,6 +177,23 @@ export default function RegistrationPDF({ org, qrDataUrl, verifyUrl }: PdfProps)
         <Text style={cert.watermark}>SAIREX</Text>
 
         <View style={cert.content}>
+          <View style={cert.topBrandRow}>
+            <View style={cert.brandLogoBox}>
+              {sairexLogoDataUrl ? (
+                <Image src={sairexLogoDataUrl} style={cert.brandLogoImage} />
+              ) : (
+                <Text style={cert.brandLogoFallback}>SairexSMS</Text>
+              )}
+            </View>
+            <View style={cert.brandLogoBox}>
+              {org.logoUrl ? (
+                <Image src={org.logoUrl} style={cert.brandLogoImage} />
+              ) : (
+                <Text style={cert.brandLogoFallback}>Organization Logo</Text>
+              )}
+            </View>
+          </View>
+
           {/* Issuer */}
           <Text style={cert.issuer}>SAIREX SMS</Text>
           <Text style={cert.issuerSub}>School Management System</Text>
@@ -222,6 +306,18 @@ export default function RegistrationPDF({ org, qrDataUrl, verifyUrl }: PdfProps)
       <Page size="A4" orientation="landscape" style={profile.page}>
         <View style={profile.topLine} />
 
+        <View style={profile.headerBrandRow}>
+          <View style={profile.headerBrandLeft}>
+            {sairexLogoDataUrl ? (
+              <Image src={sairexLogoDataUrl} style={profile.headerBrandLogo} />
+            ) : null}
+            <Text style={profile.headerBrandText}>SairexSMS Registration Profile</Text>
+          </View>
+          <View style={profile.headerOrgLogoBox}>
+            {org.logoUrl ? <Image src={org.logoUrl} style={profile.headerOrgLogo} /> : null}
+          </View>
+        </View>
+
         {/* Header */}
         <View style={profile.header}>
           <View>
@@ -242,20 +338,7 @@ export default function RegistrationPDF({ org, qrDataUrl, verifyUrl }: PdfProps)
             {/* Basic Information */}
             <View style={profile.section}>
               <Text style={profile.sectionTitle}>Basic Information</Text>
-              <Field
-                label="Organization Name"
-                value={fmt(org.organizationName)}
-              />
-              <Field label="Display Name" value={fmt(org.displayName)} />
-              <Field label="Slug" value={fmt(org.slug)} />
-              <Field
-                label="Category"
-                value={humanize(org.organizationCategory)}
-              />
-              <Field
-                label="Structure"
-                value={humanize(org.organizationStructure)}
-              />
+              {renderSchemaFields(org, onboardingIdentitySchema)}
               <MonoField label="Registration ID" value={org.id} />
               <MonoField label="Certificate No." value={certNo} />
             </View>
@@ -265,14 +348,7 @@ export default function RegistrationPDF({ org, qrDataUrl, verifyUrl }: PdfProps)
               <Text style={profile.sectionTitle}>
                 Head Office Address
               </Text>
-              <Field label="Street Address" value={fmt(org.addressLine1)} />
-              <Field label="Address Line 2" value={fmt(org.addressLine2)} />
-              <Field label="City" value={fmt(org.city)} />
-              <Field label="District" value={fmt(org.district)} />
-              <Field label="Tehsil" value={fmt(org.tehsil)} />
-              <Field label="Province" value={fmt(org.provinceState)} />
-              <Field label="Country" value={fmt(org.country)} />
-              <Field label="Postal Code" value={fmt(org.postalCode)} />
+              {renderSchemaFields(org, onboardingContactAddressSchema)}
             </View>
           </View>
 
@@ -281,43 +357,22 @@ export default function RegistrationPDF({ org, qrDataUrl, verifyUrl }: PdfProps)
             {/* Contact Information */}
             <View style={profile.section}>
               <Text style={profile.sectionTitle}>Contact Information</Text>
-              <Field
-                label="Official Email"
-                value={fmt(org.organizationEmail)}
-              />
-              <Field
-                label="Land Line Number"
-                value={fmt(org.organizationPhone)}
-              />
-              <Field
-                label="Mobile Number"
-                value={fmt(org.organizationMobile)}
-              />
+              <Field label="Official Email" value={fmt(org.organizationEmail)} />
+              <Field label="Land Line Number" value={fmt(org.organizationPhone)} />
+              <Field label="Mobile Number" value={fmt(org.organizationMobile)} />
               <Field label="WhatsApp" value={fmt(org.organizationWhatsApp)} />
-              <Field label="Website" value={fmt(org.websiteUrl)} />
             </View>
 
             {/* Compliance / Legal */}
             <View style={profile.section}>
               <Text style={profile.sectionTitle}>Compliance / Legal</Text>
-              <Field
-                label="Registration No."
-                value={fmt(org.registrationNumber)}
-              />
-              <Field label="Tax / NTN Number" value={fmt(org.taxNumber)} />
-              <Field
-                label="Established Date"
-                value={fmtDate(org.establishedDate)}
-              />
+              {renderSchemaFields(org, onboardingLegalSchema)}
             </View>
 
             {/* Branding */}
             <View style={profile.section}>
               <Text style={profile.sectionTitle}>Branding</Text>
-              <Field
-                label="Logo"
-                value={org.logoUrl ? "Uploaded" : "Not provided"}
-              />
+              {renderSchemaFields(org, onboardingBrandingSchema)}
             </View>
           </View>
         </View>

@@ -1,8 +1,10 @@
 import { StyleSheet } from "@react-pdf/renderer";
 
 export const colors = {
-  primary: "#1a56db",
-  primaryLight: "#e8eefb",
+  primary: "#1D4E89",
+  primaryLight: "#e7eff8",
+  accent: "#39B54A",
+  accentLight: "#e8f7eb",
   dark: "#111827",
   darkSoft: "#1f2937",
   muted: "#6b7280",
@@ -32,8 +34,8 @@ export const cert = StyleSheet.create({
     left: 16,
     right: 16,
     bottom: 16,
-    borderWidth: 3,
-    borderColor: colors.gold,
+    borderWidth: 2,
+    borderColor: colors.primary,
     borderStyle: "solid",
   },
 
@@ -44,7 +46,7 @@ export const cert = StyleSheet.create({
     right: 22,
     bottom: 22,
     borderWidth: 0.75,
-    borderColor: colors.goldLight,
+    borderColor: colors.accent,
     borderStyle: "solid",
   },
 
@@ -55,7 +57,7 @@ export const cert = StyleSheet.create({
     transform: "translate(-50%, -50%)",
     fontSize: 120,
     fontFamily: "Helvetica-Bold",
-    color: colors.borderLight,
+    color: colors.primaryLight,
     opacity: 0.06,
     letterSpacing: 8,
   },
@@ -64,12 +66,44 @@ export const cert = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 80,
-    paddingVertical: 30,
+    paddingHorizontal: 64,
+    paddingVertical: 24,
+  },
+
+  topBrandRow: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+
+  brandLogoBox: {
+    width: 120,
+    height: 52,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.white,
+    padding: 4,
+  },
+
+  brandLogoImage: {
+    maxWidth: 112,
+    maxHeight: 42,
+    objectFit: "contain",
+  },
+
+  brandLogoFallback: {
+    fontSize: 10,
+    color: colors.muted,
+    textAlign: "center",
   },
 
   issuer: {
-    fontSize: 24,
+    fontSize: 22,
     fontFamily: "Helvetica-Bold",
     color: colors.primary,
     letterSpacing: 6,
@@ -86,7 +120,7 @@ export const cert = StyleSheet.create({
   dividerGold: {
     width: 160,
     height: 1.5,
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     marginVertical: 10,
   },
 
@@ -98,9 +132,9 @@ export const cert = StyleSheet.create({
   },
 
   title: {
-    fontSize: 28,
+    fontSize: 25,
     fontFamily: "Helvetica-Bold",
-    color: colors.gold,
+    color: colors.primary,
     letterSpacing: 3,
     marginBottom: 12,
   },
@@ -171,7 +205,7 @@ export const cert = StyleSheet.create({
   certNo: {
     fontSize: 11,
     fontFamily: "Helvetica-Bold",
-    color: colors.goldDark,
+    color: colors.primary,
     letterSpacing: 1.5,
     marginTop: 2,
   },
@@ -190,7 +224,7 @@ export const cert = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     borderWidth: 2,
-    borderColor: colors.gold,
+    borderColor: colors.accent,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -198,7 +232,7 @@ export const cert = StyleSheet.create({
   sealText: {
     fontSize: 6,
     fontFamily: "Helvetica-Bold",
-    color: colors.gold,
+    color: colors.primary,
     letterSpacing: 1,
     textTransform: "uppercase",
   },
@@ -206,7 +240,7 @@ export const cert = StyleSheet.create({
   sealMain: {
     fontSize: 9,
     fontFamily: "Helvetica-Bold",
-    color: colors.gold,
+    color: colors.accent,
     marginVertical: 2,
   },
 
@@ -297,6 +331,47 @@ export const profile = StyleSheet.create({
     right: 0,
     height: 4,
     backgroundColor: colors.primary,
+  },
+
+  headerBrandRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+
+  headerBrandLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  headerBrandLogo: {
+    width: 34,
+    height: 34,
+    objectFit: "contain",
+  },
+
+  headerBrandText: {
+    fontSize: 9,
+    color: colors.muted,
+  },
+
+  headerOrgLogoBox: {
+    width: 56,
+    height: 34,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    borderRadius: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 3,
+  },
+
+  headerOrgLogo: {
+    maxWidth: 50,
+    maxHeight: 28,
+    objectFit: "contain",
   },
 
   header: {

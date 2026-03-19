@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { navigation } from "@/lib/config/theme";
 import { isSimpleMode, resolveOrganizationMode } from "@/lib/system/mode.service";
 import { prisma } from "@/lib/prisma";
@@ -30,6 +31,13 @@ const FOOTER_NAV_GROUPS = [
     ],
   },
 ];
+
+function normalizeExternalUrl(value?: string | null): string | null {
+  const raw = value?.trim();
+  if (!raw) return null;
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+  return `https://${raw}`;
+}
 
 export default async function AdminLayout({
   children,
@@ -69,13 +77,23 @@ export default async function AdminLayout({
   const organizationBranding = user.organizationId
     ? await prisma.organization.findUnique({
         where: { id: user.organizationId },
-        select: { logoUrl: true, displayName: true, organizationName: true },
+        select: {
+          logoUrl: true,
+          displayName: true,
+          organizationName: true,
+          websiteUrl: true,
+          facebookUrl: true,
+          instagramUrl: true,
+        },
       })
     : null;
   // Top-bar right logo should use the organization's logo when available,
   // otherwise fall back to the SAIREX SMS logo.
   const topBarLogoUrl = organizationBranding?.logoUrl || "/sairex-logo.png";
   const shouldRoundTopBarLogo = topBarLogoUrl.startsWith("/sairex-logo");
+  const websiteUrl = normalizeExternalUrl(organizationBranding?.websiteUrl);
+  const facebookUrl = normalizeExternalUrl(organizationBranding?.facebookUrl);
+  const instagramUrl = normalizeExternalUrl(organizationBranding?.instagramUrl);
 
   const tenantName =
     organizationBranding?.displayName?.trim() ||
@@ -185,13 +203,72 @@ export default async function AdminLayout({
             <p className="truncate text-center text-xs md:text-sm">
               Campus: <span className="font-semibold">{campusName}</span>
             </p>
-            <div className="flex justify-end">
+            <div className="flex items-center justify-end gap-2">
+              {websiteUrl ? (
+                <Link
+                  href={websiteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Open website"
+                  title="Website"
+                  className="inline-flex h-8 w-8 items-center justify-center text-current transition-opacity hover:opacity-85"
+                >
+                  <Image
+                    src="/social-icons/world.png"
+                    alt="Website"
+                    width={24}
+                    height={24}
+                    className="h-6 w-6"
+                    unoptimized
+                  />
+                </Link>
+              ) : null}
+              {facebookUrl ? (
+                <Link
+                  href={facebookUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Open Facebook"
+                  title="Facebook"
+                  className="inline-flex h-8 w-8 items-center justify-center transition-opacity hover:opacity-85"
+                >
+                  <Image
+                    src="/social-icons/facebook.png"
+                    alt="Facebook"
+                    width={20}
+                    height={20}
+                    className="h-5 w-5"
+                    unoptimized
+                  />
+                </Link>
+              ) : null}
+              {instagramUrl ? (
+                <Link
+                  href={instagramUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Open Instagram"
+                  title="Instagram"
+                  className="inline-flex h-8 w-8 items-center justify-center transition-opacity hover:opacity-85"
+                >
+                  <Image
+                    src="/social-icons/instagram.png"
+                    alt="Instagram"
+                    width={20}
+                    height={20}
+                    className="h-5 w-5"
+                    unoptimized
+                  />
+                </Link>
+              ) : null}
               <Image
                 src={topBarLogoUrl}
                 alt="Tenant logo"
                 width={128}
                 height={32}
-                className={`h-8 w-auto object-contain ${shouldRoundTopBarLogo ? "rounded-md" : ""}`}
+                className={`h-8 w-auto object-contain ${
+                  shouldRoundTopBarLogo ? "rounded-md" : ""
+                }`}
               />
             </div>
           </div>

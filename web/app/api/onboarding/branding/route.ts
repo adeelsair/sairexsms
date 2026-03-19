@@ -49,6 +49,9 @@ export async function POST(request: Request) {
       where: { id: org.id },
       data: {
         logoUrl: parsed.data.logoUrl || null,
+        websiteUrl: parsed.data.websiteUrl || null,
+        facebookUrl: parsed.data.facebookUrl || null,
+        instagramUrl: parsed.data.instagramUrl || null,
         onboardingStep: "COMPLETED",
       },
     });

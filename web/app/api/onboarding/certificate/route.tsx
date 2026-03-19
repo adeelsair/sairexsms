@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import QRCode from "qrcode";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { prisma } from "@/lib/prisma";
 import { requireVerifiedAuth } from "@/lib/auth-guard";
 import RegistrationPDF from "@/lib/pdf/RegistrationPDF";
@@ -28,6 +30,15 @@ export async function GET() {
   }
 
   try {
+    let sairexLogoDataUrl: string | undefined;
+    try {
+      const logoPath = path.join(process.cwd(), "app", "icon.png");
+      const logoBuffer = await readFile(logoPath);
+      sairexLogoDataUrl = `data:image/png;base64,${logoBuffer.toString("base64")}`;
+    } catch {
+      // Optional branding asset; continue without failing certificate generation.
+    }
+
     const org = await prisma.organization.findUnique({
       where: { id: orgId },
     });
@@ -67,7 +78,12 @@ export async function GET() {
     }
 
     const buffer = await renderToBuffer(
-      <RegistrationPDF org={org} qrDataUrl={qrDataUrl} verifyUrl={verifyUrl} />,
+      <RegistrationPDF
+        org={org}
+        qrDataUrl={qrDataUrl}
+        verifyUrl={verifyUrl}
+        sairexLogoDataUrl={sairexLogoDataUrl}
+      />,
     );
     const body = Uint8Array.from(buffer);
 

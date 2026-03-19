@@ -41,7 +41,7 @@ export default function CompletePage() {
     }
 
     const signInResult = await api.post<{ ok: boolean; user: { id: string } }>(
-      "/api/auth/local-login",
+      "/api/login",
       {
         email: result.data.adminEmail,
         password: draft.adminSetup.password,

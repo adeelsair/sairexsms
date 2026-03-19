@@ -131,7 +131,7 @@ function SignupForm() {
         toast.success("Account created successfully");
 
         const signInResult = await api.post<{ ok: boolean; user: { id: string } }>(
-          "/api/auth/local-login",
+          "/api/login",
           {
             email: data.email,
             password: data.password,

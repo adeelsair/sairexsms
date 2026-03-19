@@ -72,6 +72,8 @@ export default function OnboardingBrandingPage() {
     defaultValues: draft.branding ?? {
       logoUrl: "",
       websiteUrl: "",
+      facebookUrl: "",
+      instagramUrl: "",
       logoVariants: [],
     },
   });
@@ -327,6 +329,34 @@ export default function OnboardingBrandingPage() {
                     <FormLabel>Website (Optional)</FormLabel>
                     <FormControl>
                       <Input placeholder="https://school.edu.pk" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="facebookUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Facebook (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="https://facebook.com/yourpage" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="instagramUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Instagram (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="https://instagram.com/yourhandle" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

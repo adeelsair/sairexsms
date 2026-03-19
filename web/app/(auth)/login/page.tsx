@@ -23,7 +23,7 @@ export default function LoginPage() {
     setLoading(true);
 
     const result = await api.post<{ ok: boolean; user: { id: string } }>(
-      "/api/auth/local-login",
+      "/api/login",
       {
       email,
       password,

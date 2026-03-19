@@ -47,6 +47,7 @@ export function SxFormCard({ children, className }: SxFormCardProps) {
 interface SxFormSectionProps {
   title?: string;
   description?: string;
+  actions?: React.ReactNode;
   /** Column count: 1 | 2 | 3 — responsive by default */
   columns?: 1 | 2 | 3;
   children: React.ReactNode;
@@ -56,6 +57,7 @@ interface SxFormSectionProps {
 export function SxFormSection({
   title,
   description,
+  actions,
   columns = 2,
   children,
   className,
@@ -69,15 +71,18 @@ export function SxFormSection({
   return (
     <fieldset className={cn("space-y-4", className)}>
       {(title || description) && (
-        <div className="space-y-0.5">
-          {title && (
-            <legend className="text-lg font-semibold tracking-tight">
-              {title}
-            </legend>
-          )}
-          {description && (
-            <p className="text-sm text-muted-foreground">{description}</p>
-          )}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-0.5">
+            {title && (
+              <legend className="text-lg font-semibold tracking-tight">
+                {title}
+              </legend>
+            )}
+            {description && (
+              <p className="text-sm text-muted-foreground">{description}</p>
+            )}
+          </div>
+          {actions ? <div className="shrink-0">{actions}</div> : null}
         </div>
       )}
 

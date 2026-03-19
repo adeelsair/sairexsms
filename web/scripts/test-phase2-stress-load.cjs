@@ -74,7 +74,7 @@ async function request(pathname, { method = "GET", jar, body, headers = {} } = {
 
 async function signIn(email, password) {
   const jar = new CookieJar();
-  const login = await request("/api/auth/local-login", {
+  const login = await request("/api/login", {
     method: "POST",
     jar,
     body: { email, password },
