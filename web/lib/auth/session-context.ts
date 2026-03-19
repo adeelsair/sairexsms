@@ -22,20 +22,59 @@ export async function resolveSessionContext(
     include: {
       memberships: {
         where: {
-          status: "ACTIVE",
           ...(preferredOrganizationId
             ? { organizationId: preferredOrganizationId }
             : {}),
         },
         include: { organization: true },
         orderBy: { createdAt: "asc" },
-        take: 1,
+        take: 5,
       },
     },
   });
 
   if (!user || !user.isActive) return null;
-  const membership = user.memberships[0] ?? null;
+
+  const activeMembership = user.memberships.find((m) => m.status === "ACTIVE");
+  const invitedMembership = user.memberships.find((m) => m.status === "INVITED");
+  const membership =
+    activeMembership ?? invitedMembership ?? user.memberships[0] ?? null;
+
+  let resolvedOrganizationId = membership?.organizationId ?? null;
+  let resolvedCampusId = membership?.campusId ?? null;
+  let resolvedMembershipId = membership?.id ?? null;
+  let resolvedOrganizationStructure =
+    membership?.organization?.organizationStructure ?? null;
+  let resolvedUnitPath = membership?.unitPath ?? null;
+
+  // Platform users can exist without membership rows; choose a default org context.
+  if (
+    !resolvedOrganizationId &&
+    (user.platformRole === "SUPER_ADMIN" || user.platformRole === "SUPPORT")
+  ) {
+    const defaultOrg = await prisma.organization.findFirst({
+      where: { status: "ACTIVE" },
+      select: { id: true, organizationStructure: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (defaultOrg) {
+      resolvedOrganizationId = defaultOrg.id;
+      resolvedOrganizationStructure = defaultOrg.organizationStructure;
+
+      const mainCampus = await prisma.campus.findFirst({
+        where: {
+          organizationId: defaultOrg.id,
+          isMainCampus: true,
+        },
+        select: { id: true },
+      });
+
+      resolvedCampusId = mainCampus?.id ?? null;
+      resolvedMembershipId = null;
+      resolvedUnitPath = null;
+    }
+  }
 
   return {
     userId: user.id,
@@ -43,10 +82,10 @@ export async function resolveSessionContext(
     name: user.name ?? user.email ?? user.phone ?? "",
     platformRole: user.platformRole ?? null,
     role: membership?.role ?? null,
-    organizationId: membership?.organizationId ?? null,
-    campusId: membership?.campusId ?? null,
-    membershipId: membership?.id ?? null,
-    organizationStructure: membership?.organization?.organizationStructure ?? null,
-    unitPath: membership?.unitPath ?? null,
+    organizationId: resolvedOrganizationId,
+    campusId: resolvedCampusId,
+    membershipId: resolvedMembershipId,
+    organizationStructure: resolvedOrganizationStructure,
+    unitPath: resolvedUnitPath,
   };
 }
