@@ -39,6 +39,44 @@ function normalizeExternalUrl(value?: string | null): string | null {
   return `https://${raw}`;
 }
 
+type OrgBrandingRow = {
+  logoUrl: string | null;
+  displayName: string | null;
+  organizationName: string | null;
+  websiteUrl: string | null;
+  facebookUrl?: string | null;
+  instagramUrl?: string | null;
+};
+
+async function loadOrganizationBrandingForLayout(
+  organizationId: string,
+): Promise<OrgBrandingRow | null> {
+  try {
+    return await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: {
+        logoUrl: true,
+        displayName: true,
+        organizationName: true,
+        websiteUrl: true,
+        facebookUrl: true,
+        instagramUrl: true,
+      },
+    });
+  } catch {
+    // Prod DB may not have migrated social columns yet (schema/DB drift).
+    return await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: {
+        logoUrl: true,
+        displayName: true,
+        organizationName: true,
+        websiteUrl: true,
+      },
+    });
+  }
+}
+
 export default async function AdminLayout({
   children,
 }: {
@@ -75,17 +113,7 @@ export default async function AdminLayout({
   const shouldRoundSairexLogo = true;
 
   const organizationBranding = user.organizationId
-    ? await prisma.organization.findUnique({
-        where: { id: user.organizationId },
-        select: {
-          logoUrl: true,
-          displayName: true,
-          organizationName: true,
-          websiteUrl: true,
-          facebookUrl: true,
-          instagramUrl: true,
-        },
-      })
+    ? await loadOrganizationBrandingForLayout(user.organizationId)
     : null;
   // Top-bar right logo should use the organization's logo when available,
   // otherwise fall back to the SAIREX SMS logo.

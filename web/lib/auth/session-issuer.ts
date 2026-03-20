@@ -10,7 +10,13 @@ export async function issueSessionForUserId(
   userId: number,
   preferredOrganizationId?: string | null,
 ) {
-  let context = await resolveSessionContext(userId, preferredOrganizationId);
+  let context: Awaited<ReturnType<typeof resolveSessionContext>> = null;
+  try {
+    context = await resolveSessionContext(userId, preferredOrganizationId);
+  } catch (err) {
+    console.error("[issueSessionForUserId] resolveSessionContext failed:", err);
+    context = null;
+  }
 
   // Fallback path: if tenant context cannot be resolved (or membership data is
   // inconsistent in a deployed environment), still issue a minimal platform

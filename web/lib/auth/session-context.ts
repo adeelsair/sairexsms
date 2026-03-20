@@ -26,7 +26,16 @@ export async function resolveSessionContext(
             ? { organizationId: preferredOrganizationId }
             : {}),
         },
-        include: { organization: true },
+        // Narrow org fields: loading full Organization can fail on prod DBs that
+        // lag migrations (new columns in schema but not yet in database).
+        include: {
+          organization: {
+            select: {
+              id: true,
+              organizationStructure: true,
+            },
+          },
+        },
         orderBy: { createdAt: "asc" },
         take: 5,
       },

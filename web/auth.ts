@@ -75,10 +75,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       });
       if (!latestSession) return session;
 
-      const baseCtx = await resolveSessionContext(
-        userId,
-        latestSession.organizationId ?? null,
-      );
+      let baseCtx: Awaited<ReturnType<typeof resolveSessionContext>> = null;
+      try {
+        baseCtx = await resolveSessionContext(
+          userId,
+          latestSession.organizationId ?? null,
+        );
+      } catch (err) {
+        console.error("[auth.session] resolveSessionContext failed:", err);
+        baseCtx = null;
+      }
 
       if (!latestSession.organizationId && baseCtx) {
         await prisma.session.update({
