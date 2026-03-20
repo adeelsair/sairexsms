@@ -1,0 +1,50 @@
+import type { Prisma } from "@/lib/generated/prisma";
+
+/**
+ * Organization scalars for list/detail API responses when production Postgres may
+ * lag Prisma migrations (e.g. missing social / certificate columns). Omit fields
+ * added in newer migrations so `findMany`/`findUnique` do not SELECT missing columns.
+ */
+export const organizationScalarSelectSafe: Prisma.OrganizationSelect = {
+  id: true,
+  slug: true,
+  status: true,
+  mode: true,
+  isDemo: true,
+  onboardingStep: true,
+  createdByUserId: true,
+  createdAt: true,
+  updatedAt: true,
+  organizationName: true,
+  displayName: true,
+  organizationCategory: true,
+  organizationStructure: true,
+  registrationNumber: true,
+  taxNumber: true,
+  establishedDate: true,
+  addressLine1: true,
+  addressLine2: true,
+  country: true,
+  provinceState: true,
+  district: true,
+  tehsil: true,
+  city: true,
+  postalCode: true,
+  organizationEmail: true,
+  organizationPhone: true,
+  organizationMobile: true,
+  organizationWhatsApp: true,
+  websiteUrl: true,
+  logoUrl: true,
+  logoKey: true,
+  logoUpdatedAt: true,
+  logoLightUrl: true,
+  logoDarkUrl: true,
+  logoPrintUrl: true,
+  primaryColor: true,
+  accentColor: true,
+  themeMode: true,
+  financeRoutingMode: true,
+  timezone: true,
+  demoSeededAt: true,
+};

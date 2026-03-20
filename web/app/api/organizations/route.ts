@@ -5,6 +5,7 @@ import { generateOrganizationId } from "@/lib/id-generators";
 import { createOrganizationSchema } from "@/lib/validations";
 import { logger } from "@/lib/logger";
 import { TRIAL_POLICY, createTrialWindow } from "@/lib/billing/pricing-architecture";
+import { organizationScalarSelectSafe } from "@/lib/prisma/organization-safe-select";
 
 export async function GET() {
   const guard = await requireAuth();
@@ -18,6 +19,7 @@ export async function GET() {
     const orgs = await prisma.organization.findMany({
       where,
       orderBy: { createdAt: "desc" },
+      select: organizationScalarSelectSafe,
     });
     return NextResponse.json(orgs);
   } catch (error) {

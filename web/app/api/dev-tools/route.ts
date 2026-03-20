@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireRole } from "@/lib/auth-guard";
+import { organizationScalarSelectSafe } from "@/lib/prisma/organization-safe-select";
 
 /**
  * GET /api/dev-tools
@@ -29,7 +30,8 @@ export async function GET() {
       }),
       prisma.organization.findMany({
         orderBy: { createdAt: "desc" },
-        include: {
+        select: {
+          ...organizationScalarSelectSafe,
           _count: {
             select: { memberships: true, campuses: true, students: true },
           },
