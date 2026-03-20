@@ -15,6 +15,9 @@ BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-7}"
 BACKUP_DIR="${BACKUP_DIR:-/opt/sairex/backups}"
 POSTGRES_USER="${POSTGRES_USER:-sairex}"
 POSTGRES_DB="${POSTGRES_DB:-sairex}"
+APP_HEALTH_MAX_CHECKS="${APP_HEALTH_MAX_CHECKS:-40}"
+APP_HEALTH_SLEEP_SECONDS="${APP_HEALTH_SLEEP_SECONDS:-5}"
+APP_LOG_TAIL_LINES="${APP_LOG_TAIL_LINES:-200}"
 
 APP_CONTAINER_NAME="${APP_CONTAINER_NAME:-sairex_app}"
 WORKER_CONTAINER_NAME="${WORKER_CONTAINER_NAME:-sairex_worker}"
@@ -64,6 +67,15 @@ auto_clean_conflicts_for_data_services() {
   [[ "${AUTO_CLEAN_CONFLICTS}" == "true" ]] || return 0
   remove_container_if_exists "${DB_CONTAINER_NAME}"
   remove_container_if_exists "${REDIS_CONTAINER_NAME}"
+}
+
+print_app_diagnostics() {
+  echo "---- App diagnostics (docker inspect) ----" >&2
+  docker inspect "${APP_CONTAINER_NAME}" --format '{{json .State}}' 2>/dev/null || true
+  echo "---- App diagnostics (container logs tail) ----" >&2
+  docker logs --tail "${APP_LOG_TAIL_LINES}" "${APP_CONTAINER_NAME}" 2>/dev/null || true
+  echo "---- App diagnostics (compose service logs tail) ----" >&2
+  compose_cmd logs --tail "${APP_LOG_TAIL_LINES}" app 2>/dev/null || true
 }
 
 timestamp="$(date +%Y%m%d_%H%M%S)"
@@ -135,17 +147,19 @@ else
 fi
 
 echo "Waiting for app container health..."
-for i in {1..20}; do
+for ((i=1; i<=APP_HEALTH_MAX_CHECKS; i++)); do
   app_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}running{{end}}' sairex_app 2>/dev/null || true)"
+  echo "Health check ${i}/${APP_HEALTH_MAX_CHECKS}: ${app_health:-unknown}"
   if [[ "${app_health}" == "healthy" || "${app_health}" == "running" ]]; then
     break
   fi
-  sleep 5
+  sleep "${APP_HEALTH_SLEEP_SECONDS}"
 done
 
 app_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}running{{end}}' sairex_app 2>/dev/null || true)"
 if [[ "${app_health}" != "healthy" && "${app_health}" != "running" ]]; then
   echo "App container is not healthy (status: ${app_health})." >&2
+  print_app_diagnostics
   exit 1
 fi
 
