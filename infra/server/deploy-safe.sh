@@ -10,10 +10,17 @@ IMAGE_REF="${IMAGE_REF:?IMAGE_REF is required (example: ghcr.io/owner/sairexsms:
 RUN_MIGRATIONS="${RUN_MIGRATIONS:-true}"
 CREATE_DB_BACKUP="${CREATE_DB_BACKUP:-true}"
 UP_NO_DEPS="${UP_NO_DEPS:-true}"
+AUTO_CLEAN_CONFLICTS="${AUTO_CLEAN_CONFLICTS:-true}"
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-7}"
 BACKUP_DIR="${BACKUP_DIR:-/opt/sairex/backups}"
 POSTGRES_USER="${POSTGRES_USER:-sairex}"
 POSTGRES_DB="${POSTGRES_DB:-sairex}"
+
+APP_CONTAINER_NAME="${APP_CONTAINER_NAME:-sairex_app}"
+WORKER_CONTAINER_NAME="${WORKER_CONTAINER_NAME:-sairex_worker}"
+SMS_WORKER_CONTAINER_NAME="${SMS_WORKER_CONTAINER_NAME:-sairex_sms_worker}"
+DB_CONTAINER_NAME="${DB_CONTAINER_NAME:-sairex_db}"
+REDIS_CONTAINER_NAME="${REDIS_CONTAINER_NAME:-sairex_redis}"
 
 cd "${APP_DIR}"
 
@@ -30,6 +37,33 @@ fi
 compose_cmd() {
   SAIREX_ENV_FILE="${SAIREX_ENV_FILE_VALUE}" \
     docker compose -f "${COMPOSE_FILE_PATH}" --env-file "${ENV_FILE_PATH}" "$@"
+}
+
+container_exists() {
+  local name="$1"
+  docker inspect "$name" >/dev/null 2>&1
+}
+
+remove_container_if_exists() {
+  local name="$1"
+  if ! container_exists "$name"; then
+    return 0
+  fi
+  echo "Auto-clean: removing existing container ${name}"
+  docker rm -f "$name" >/dev/null 2>&1 || true
+}
+
+auto_clean_conflicts_for_app_services() {
+  [[ "${AUTO_CLEAN_CONFLICTS}" == "true" ]] || return 0
+  remove_container_if_exists "${APP_CONTAINER_NAME}"
+  remove_container_if_exists "${WORKER_CONTAINER_NAME}"
+  remove_container_if_exists "${SMS_WORKER_CONTAINER_NAME}"
+}
+
+auto_clean_conflicts_for_data_services() {
+  [[ "${AUTO_CLEAN_CONFLICTS}" == "true" ]] || return 0
+  remove_container_if_exists "${DB_CONTAINER_NAME}"
+  remove_container_if_exists "${REDIS_CONTAINER_NAME}"
 }
 
 timestamp="$(date +%Y%m%d_%H%M%S)"
@@ -53,6 +87,7 @@ rollback() {
 trap rollback ERR
 
 if [[ "${CREATE_DB_BACKUP}" == "true" ]]; then
+  auto_clean_conflicts_for_data_services
   if ! mkdir -p "${BACKUP_DIR}" 2>/dev/null; then
     BACKUP_DIR="${APP_DIR}/backups"
     mkdir -p "${BACKUP_DIR}"
@@ -87,10 +122,12 @@ compose_cmd pull app worker sms_worker migrate
 
 if [[ "${RUN_MIGRATIONS}" == "true" ]]; then
   echo "Running migrations..."
+  auto_clean_conflicts_for_data_services
   compose_cmd run --rm --no-deps migrate
 fi
 
 echo "Starting updated services..."
+auto_clean_conflicts_for_app_services
 if [[ "${UP_NO_DEPS}" == "true" ]]; then
   compose_cmd up -d --no-deps app worker sms_worker
 else
