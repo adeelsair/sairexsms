@@ -9,6 +9,7 @@ SAIREX_ENV_FILE_VALUE="${SAIREX_ENV_FILE_VALUE:-$(basename "${ENV_FILE_PATH}")}"
 IMAGE_REF="${IMAGE_REF:?IMAGE_REF is required (example: ghcr.io/owner/sairexsms:sha-abc123)}"
 RUN_MIGRATIONS="${RUN_MIGRATIONS:-true}"
 CREATE_DB_BACKUP="${CREATE_DB_BACKUP:-true}"
+UP_NO_DEPS="${UP_NO_DEPS:-true}"
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-7}"
 BACKUP_DIR="${BACKUP_DIR:-/opt/sairex/backups}"
 POSTGRES_USER="${POSTGRES_USER:-sairex}"
@@ -39,7 +40,12 @@ rollback() {
   echo "Deployment failed. Rolling back..."
   cp "${env_backup}" "${ENV_FILE_PATH}"
 
-  if ! compose_cmd up -d app worker sms_worker; then
+  up_args=(up -d app worker sms_worker)
+  if [[ "${UP_NO_DEPS}" == "true" ]]; then
+    up_args=(up -d --no-deps app worker sms_worker)
+  fi
+
+  if ! compose_cmd "${up_args[@]}"; then
     echo "Rollback service restart failed. Manual intervention required." >&2
   fi
 }
@@ -59,8 +65,12 @@ if [[ "${CREATE_DB_BACKUP}" == "true" ]]; then
   fi
   backup_file="${BACKUP_DIR}/db_${timestamp}.sql"
   echo "Creating database backup: ${backup_file}"
-  compose_cmd exec -T db \
-    pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" > "${backup_file}"
+  if [[ -z "$(compose_cmd ps --status running db | awk 'NR>1 {print}')" ]]; then
+    echo "Warning: db service is not running; skipping DB backup." >&2
+  else
+    compose_cmd exec -T db \
+      pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" > "${backup_file}"
+  fi
 fi
 
 if grep -q '^SAIREX_IMAGE=' "${ENV_FILE_PATH}"; then
@@ -77,11 +87,15 @@ compose_cmd pull app worker sms_worker migrate
 
 if [[ "${RUN_MIGRATIONS}" == "true" ]]; then
   echo "Running migrations..."
-  compose_cmd run --rm migrate
+  compose_cmd run --rm --no-deps migrate
 fi
 
 echo "Starting updated services..."
-compose_cmd up -d app worker sms_worker
+if [[ "${UP_NO_DEPS}" == "true" ]]; then
+  compose_cmd up -d --no-deps app worker sms_worker
+else
+  compose_cmd up -d app worker sms_worker
+fi
 
 echo "Waiting for app container health..."
 for i in {1..20}; do
