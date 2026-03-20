@@ -130,6 +130,15 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ error: "User not found" }, { status: 404 });
       }
       if (targetUser.platformRole === "SUPER_ADMIN") {
+        const superAdminCount = await prisma.user.count({
+          where: { platformRole: "SUPER_ADMIN" },
+        });
+        if (superAdminCount <= 1) {
+          return NextResponse.json(
+            { error: "Cannot delete last super admin" },
+            { status: 403 },
+          );
+        }
         return NextResponse.json(
           { error: "SUPER_ADMIN users cannot be deleted via dev-tools" },
           { status: 403 },

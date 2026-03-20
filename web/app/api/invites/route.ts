@@ -308,6 +308,13 @@ export async function PUT(request: Request) {
       );
     }
 
+    if (targetUser.platformRole === "SUPER_ADMIN") {
+      return NextResponse.json(
+        { error: "Cannot modify super admin" },
+        { status: 403 },
+      );
+    }
+
     const updated = await prisma.user.update({
       where: { id: parseInt(userId) },
       data: { isActive },

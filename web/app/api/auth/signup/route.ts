@@ -9,6 +9,31 @@ import {
   isPasswordPolicyCompliant,
 } from "@/lib/auth/password-policy";
 
+async function sendVerificationEmail(toEmail: string, verifyToken: string) {
+  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+  const verifyUrl = `${baseUrl}/api/auth/verify-email?token=${verifyToken}`;
+
+  await dispatchAuthEmail({
+    to: toEmail,
+    subject: "Verify your email — SAIREX SMS",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+        <h2 style="color: #1e40af;">SAIREX SMS</h2>
+        <p>Thank you for registering. Please verify your email address to continue.</p>
+        <p style="margin: 24px 0;">
+          <a href="${verifyUrl}"
+             style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+            Verify Email
+          </a>
+        </p>
+        <p style="color: #64748b; font-size: 14px;">
+          This link expires in 24 hours. If you didn't create this account, ignore this email.
+        </p>
+      </div>
+    `,
+  });
+}
+
 /**
  * POST /api/auth/signup
  *
@@ -40,11 +65,39 @@ export async function POST(request: Request) {
       );
     }
 
+    const normalizedEmail = email.toLowerCase();
     const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email: normalizedEmail },
     });
 
     if (existingUser) {
+      if (!existingUser.emailVerifiedAt && !existingUser.platformRole) {
+        const verifyToken = crypto.randomBytes(32).toString("hex");
+        const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+        await prisma.user.update({
+          where: { id: existingUser.id },
+          data: {
+            name,
+            password: await bcrypt.hash(password, 12),
+            emailVerifyToken: verifyToken,
+            emailVerifyExpires: verifyExpires,
+            isActive: false,
+          },
+        });
+
+        await sendVerificationEmail(normalizedEmail, verifyToken);
+
+        return NextResponse.json(
+          {
+            message: "Email not verified. A new verification email has been sent.",
+            verified: false,
+            resent: true,
+          },
+          { status: 200 },
+        );
+      }
+
       return NextResponse.json(
         { error: "An account with this email already exists" },
         { status: 409 },
@@ -138,36 +191,14 @@ export async function POST(request: Request) {
     await prisma.user.create({
       data: {
         name,
-        email: email.toLowerCase(),
+        email: normalizedEmail,
         password: hashedPassword,
         isActive: false,
         emailVerifyToken: verifyToken,
         emailVerifyExpires: verifyExpires,
       },
     });
-
-    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-    const verifyUrl = `${baseUrl}/api/auth/verify-email?token=${verifyToken}`;
-
-    await dispatchAuthEmail({
-      to: email.toLowerCase(),
-      subject: "Verify your email — SAIREX SMS",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #1e40af;">SAIREX SMS</h2>
-          <p>Thank you for registering. Please verify your email address to continue.</p>
-          <p style="margin: 24px 0;">
-            <a href="${verifyUrl}"
-               style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">
-              Verify Email
-            </a>
-          </p>
-          <p style="color: #64748b; font-size: 14px;">
-            This link expires in 24 hours. If you didn't create this account, ignore this email.
-          </p>
-        </div>
-      `,
-    });
+    await sendVerificationEmail(normalizedEmail, verifyToken);
 
     return NextResponse.json(
       {
