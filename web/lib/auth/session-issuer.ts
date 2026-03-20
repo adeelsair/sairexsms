@@ -10,8 +10,39 @@ export async function issueSessionForUserId(
   userId: number,
   preferredOrganizationId?: string | null,
 ) {
-  const context = await resolveSessionContext(userId, preferredOrganizationId);
-  if (!context) return null;
+  let context = await resolveSessionContext(userId, preferredOrganizationId);
+
+  // Fallback path: if tenant context cannot be resolved (or membership data is
+  // inconsistent in a deployed environment), still issue a minimal platform
+  // session so login does not hard-fail. Session callback can enrich later.
+  if (!context) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+        name: true,
+        isActive: true,
+        platformRole: true,
+      },
+    });
+
+    if (!user || !user.isActive) return null;
+
+    context = {
+      userId: user.id,
+      email: user.email ?? user.phone ?? "",
+      name: user.name ?? user.email ?? user.phone ?? "",
+      platformRole: user.platformRole ?? null,
+      role: null,
+      organizationId: null,
+      campusId: null,
+      membershipId: null,
+      organizationStructure: null,
+      unitPath: null,
+    };
+  }
 
   const sessionToken = randomBytes(32).toString("hex");
   const expires = new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000);
