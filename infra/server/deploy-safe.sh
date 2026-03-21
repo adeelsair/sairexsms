@@ -18,6 +18,8 @@ POSTGRES_DB="${POSTGRES_DB:-sairex}"
 APP_HEALTH_MAX_CHECKS="${APP_HEALTH_MAX_CHECKS:-40}"
 APP_HEALTH_SLEEP_SECONDS="${APP_HEALTH_SLEEP_SECONDS:-5}"
 APP_LOG_TAIL_LINES="${APP_LOG_TAIL_LINES:-200}"
+CORE_SERVICE_MAX_CHECKS="${CORE_SERVICE_MAX_CHECKS:-30}"
+CORE_SERVICE_SLEEP_SECONDS="${CORE_SERVICE_SLEEP_SECONDS:-2}"
 
 APP_CONTAINER_NAME="${APP_CONTAINER_NAME:-sairex_app}"
 WORKER_CONTAINER_NAME="${WORKER_CONTAINER_NAME:-sairex_worker}"
@@ -69,6 +71,38 @@ auto_clean_conflicts_for_data_services() {
   remove_container_if_exists "${REDIS_CONTAINER_NAME}"
 }
 
+wait_for_container_running() {
+  local container_name="$1"
+  local checks="$2"
+  local sleep_seconds="$3"
+  local state=""
+  for ((i=1; i<=checks; i++)); do
+    state="$(docker inspect --format '{{.State.Status}}' "${container_name}" 2>/dev/null || true)"
+    echo "Service check ${container_name} ${i}/${checks}: ${state:-unknown}"
+    if [[ "${state}" == "running" ]]; then
+      return 0
+    fi
+    sleep "${sleep_seconds}"
+  done
+  return 1
+}
+
+ensure_core_services() {
+  echo "Ensuring core services are running (traefik, db, redis)..."
+  compose_cmd up -d traefik db redis
+
+  wait_for_container_running "${DB_CONTAINER_NAME}" "${CORE_SERVICE_MAX_CHECKS}" "${CORE_SERVICE_SLEEP_SECONDS}" || {
+    echo "Database container is not running: ${DB_CONTAINER_NAME}" >&2
+    return 1
+  }
+  wait_for_container_running "${REDIS_CONTAINER_NAME}" "${CORE_SERVICE_MAX_CHECKS}" "${CORE_SERVICE_SLEEP_SECONDS}" || {
+    echo "Redis container is not running: ${REDIS_CONTAINER_NAME}" >&2
+    return 1
+  }
+
+  echo "Core services are running."
+}
+
 print_app_diagnostics() {
   echo "---- App diagnostics (docker inspect) ----" >&2
   docker inspect "${APP_CONTAINER_NAME}" --format '{{json .State}}' 2>/dev/null || true
@@ -100,6 +134,7 @@ trap rollback ERR
 
 if [[ "${CREATE_DB_BACKUP}" == "true" ]]; then
   auto_clean_conflicts_for_data_services
+  ensure_core_services
   if ! mkdir -p "${BACKUP_DIR}" 2>/dev/null; then
     BACKUP_DIR="${APP_DIR}/backups"
     mkdir -p "${BACKUP_DIR}"
@@ -132,9 +167,13 @@ compose_cmd config > /dev/null
 echo "Pulling latest images..."
 compose_cmd pull app worker sms_worker migrate
 
+if [[ "${CREATE_DB_BACKUP}" != "true" ]]; then
+  auto_clean_conflicts_for_data_services
+  ensure_core_services
+fi
+
 if [[ "${RUN_MIGRATIONS}" == "true" ]]; then
   echo "Running migrations..."
-  auto_clean_conflicts_for_data_services
   compose_cmd run --rm --no-deps migrate
 fi
 
