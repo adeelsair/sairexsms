@@ -88,8 +88,8 @@ wait_for_container_running() {
 }
 
 ensure_core_services() {
-  echo "Ensuring core services are running (traefik, db, redis)..."
-  compose_cmd up -d traefik db redis
+  echo "Ensuring core services are running (db, redis)..."
+  compose_cmd up -d db redis
 
   wait_for_container_running "${DB_CONTAINER_NAME}" "${CORE_SERVICE_MAX_CHECKS}" "${CORE_SERVICE_SLEEP_SECONDS}" || {
     echo "Database container is not running: ${DB_CONTAINER_NAME}" >&2
