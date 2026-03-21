@@ -13,6 +13,10 @@ This runbook keeps local, GitHub, and production aligned for each release.
   - SMS vars are set for selected provider (`SMS_PROVIDER` + provider credentials).
   - `SMS_DRY_RUN` is disabled for real OTP sends.
   - Queue workers are running (OTP/email jobs are processed).
+- Production edge mode is set for deploy safety checks:
+  - `EDGE_ROUTER_MODE=nginx` for host nginx reverse proxy to app on `127.0.0.1:3000`.
+  - `EDGE_ROUTER_MODE=traefik` for containerized Traefik edge.
+  - `EDGE_ROUTER_MODE=auto` if both patterns may exist.
 
 ## 1) Local pre-flight
 
@@ -101,6 +105,10 @@ gh run view <run_id> --log-failed
 Common current infra issue:
 
 - Container name conflict (`*_db`, `*_redis` already in use).
+- Edge mismatch (deploy healthy, external `502 Bad Gateway`):
+  - If using host nginx, ensure `proxy_pass http://127.0.0.1:3000;`
+  - Ensure deploy env has `EDGE_ROUTER_MODE=nginx`.
+  - If using Traefik edge, set `EDGE_ROUTER_MODE=traefik`.
 
 If seen, resolve on server in maintenance window before retrying deploy.
 

@@ -20,6 +20,7 @@ APP_HEALTH_SLEEP_SECONDS="${APP_HEALTH_SLEEP_SECONDS:-5}"
 APP_LOG_TAIL_LINES="${APP_LOG_TAIL_LINES:-200}"
 CORE_SERVICE_MAX_CHECKS="${CORE_SERVICE_MAX_CHECKS:-30}"
 CORE_SERVICE_SLEEP_SECONDS="${CORE_SERVICE_SLEEP_SECONDS:-2}"
+EDGE_ROUTER_MODE="${EDGE_ROUTER_MODE:-auto}"
 
 APP_CONTAINER_NAME="${APP_CONTAINER_NAME:-sairex_app}"
 WORKER_CONTAINER_NAME="${WORKER_CONTAINER_NAME:-sairex_worker}"
@@ -110,6 +111,55 @@ print_app_diagnostics() {
   docker logs --tail "${APP_LOG_TAIL_LINES}" "${APP_CONTAINER_NAME}" 2>/dev/null || true
   echo "---- App diagnostics (compose service logs tail) ----" >&2
   compose_cmd logs --tail "${APP_LOG_TAIL_LINES}" app 2>/dev/null || true
+}
+
+print_edge_diagnostics() {
+  echo "---- Edge diagnostics ----" >&2
+  echo "EDGE_ROUTER_MODE=${EDGE_ROUTER_MODE}" >&2
+  docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null || true
+  echo "App port mappings:" >&2
+  docker port "${APP_CONTAINER_NAME}" 2>/dev/null || true
+}
+
+assert_edge_routing_ready() {
+  local app_ports
+  app_ports="$(docker port "${APP_CONTAINER_NAME}" 2>/dev/null || true)"
+  local traefik_running="false"
+  if docker inspect --format '{{.State.Status}}' traefik 2>/dev/null | grep -q '^running$'; then
+    traefik_running="true"
+  fi
+
+  if [[ "${EDGE_ROUTER_MODE}" == "nginx" ]]; then
+    if ! echo "${app_ports}" | grep -q '127\.0\.0\.1:3000'; then
+      echo "EDGE check failed (nginx mode): expected ${APP_CONTAINER_NAME} to publish 127.0.0.1:3000." >&2
+      print_edge_diagnostics
+      return 1
+    fi
+    return 0
+  fi
+
+  if [[ "${EDGE_ROUTER_MODE}" == "traefik" ]]; then
+    if [[ "${traefik_running}" != "true" ]]; then
+      echo "EDGE check failed (traefik mode): traefik container is not running." >&2
+      print_edge_diagnostics
+      return 1
+    fi
+    return 0
+  fi
+
+  # auto mode: accept either known-good edge path
+  if echo "${app_ports}" | grep -q '127\.0\.0\.1:3000'; then
+    echo "Edge check (auto): nginx-compatible localhost app binding detected."
+    return 0
+  fi
+  if [[ "${traefik_running}" == "true" ]]; then
+    echo "Edge check (auto): traefik container is running."
+    return 0
+  fi
+
+  echo "EDGE check failed (auto mode): neither nginx localhost binding nor running traefik detected." >&2
+  print_edge_diagnostics
+  return 1
 }
 
 timestamp="$(date +%Y%m%d_%H%M%S)"
@@ -206,6 +256,8 @@ if [[ -z "$(compose_cmd ps --status running sms_worker | awk 'NR>1 {print}')" ]]
   echo "SMS worker is not running." >&2
   exit 1
 fi
+
+assert_edge_routing_ready
 
 if [[ "${CREATE_DB_BACKUP}" == "true" ]]; then
   find "${BACKUP_DIR}" -type f -name "db_*.sql" -mtime +"${BACKUP_RETENTION_DAYS}" -delete || true
