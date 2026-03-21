@@ -105,6 +105,9 @@ jobs:
                 echo "DIRECT_URL=${db_url}" >> "${ENV_FILE_PATH}"
               fi
             fi
+            if ! grep -q '^EDGE_ROUTER_MODE=' "${ENV_FILE_PATH}"; then
+              echo "EDGE_ROUTER_MODE=nginx" >> "${ENV_FILE_PATH}"
+            fi
 
             IMAGE_REF="${{ steps.image.outputs.image_ref }}" \
             RUN_MIGRATIONS="${{ steps.image.outputs.run_migrations }}" \
