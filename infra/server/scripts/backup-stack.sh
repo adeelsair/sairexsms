@@ -3,19 +3,13 @@
 # SairexSMS — full stack backup (Postgres + Redis data + config snapshots).
 # Safe for Docker Compose production layout (container names sairex_db / sairex_redis).
 #
-# Does NOT use pg_dumpall against wrong users; matches deploy-safe.sh (single DB SQL).
-#
-# Usage:
-#   SAIREX_REPO=/home/sairex/SairexSMS ./backup-stack.sh
-#
-# Optional:
-#   BACKUP_ROOT=~/sairex-stack-backups   (default)
-#   RETENTION_DAYS=14
-#   RCLONE_REMOTE_PATH=remote:bucket/sairex   (after `rclone config`)
-#   SAIREX_UPLOADS_PATH=/path/to/host/uploads  (if you bind-mount uploads later)
+# Writes JSON status for the admin dashboard: ${BACKUP_ROOT}/backup-last-run.json
+# Optional Telegram: TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID (via telegram-notify.sh).
+#   TELEGRAM_NOTIFY_SUCCESS=true — also message on success (default: failures only).
 #
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SAIREX_REPO="${SAIREX_REPO:-${HOME}/SairexSMS}"
 BACKUP_ROOT="${BACKUP_ROOT:-${HOME}/sairex-stack-backups}"
 RETENTION_DAYS="${RETENTION_DAYS:-14}"
@@ -32,12 +26,68 @@ ARCHIVE="${BACKUP_ROOT}/sairex-stack-${STAMP}.tar.gz"
 
 log() { echo "[backup-stack] $*"; }
 
-if ! docker info >/dev/null 2>&1; then
-  echo "[backup-stack] ERROR: docker not available" >&2
+notify() {
+  "${SCRIPT_DIR}/telegram-notify.sh" "$1" || true
+}
+
+write_status_json() {
+  # Args: status  error_message  archive_path_or_empty
+  local status="$1"
+  local err="${2:-}"
+  local arch="${3:-}"
+  mkdir -p "${BACKUP_ROOT}"
+  local out="${BACKUP_ROOT}/backup-last-run.json"
+  export _BS_OUT="${out}"
+  export _BS_TS="$(date -Iseconds 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
+  export _BS_STATUS="${status}"
+  export _BS_ERR="${err}"
+  export _BS_ARCH="${arch}"
+  if ! python3 <<'PY'
+import json, os, pathlib, socket
+out = os.environ["_BS_OUT"]
+ts = os.environ["_BS_TS"]
+status = os.environ["_BS_STATUS"]
+err = os.environ.get("_BS_ERR") or ""
+arch = os.environ.get("_BS_ARCH") or ""
+size = 0
+if arch and pathlib.Path(arch).is_file():
+    size = pathlib.Path(arch).stat().st_size
+name = arch.split("/")[-1] if arch else None
+with open(out, "w", encoding="utf-8") as f:
+    json.dump(
+        {
+            "timestamp": ts,
+            "status": status,
+            "error": err or None,
+            "archivePath": arch or None,
+            "archiveFileName": name,
+            "sizeBytes": size,
+            "host": socket.gethostname(),
+        },
+        f,
+        indent=2,
+    )
+PY
+  then
+    printf '{"timestamp":"%s","status":"%s","error":"status json write failed"}\n' "$(date -Iseconds)" "${status}" >"${out}"
+  fi
+  unset _BS_OUT _BS_TS _BS_STATUS _BS_ERR _BS_ARCH
+}
+
+fail() {
+  local msg="$1"
+  write_status_json "failed" "${msg}" ""
+  notify "❌ SairexSMS backup-stack failed on $(hostname 2>/dev/null): ${msg}"
+  echo "[backup-stack] ERROR: ${msg}" >&2
   exit 1
-fi
+}
 
 mkdir -p "${BACKUP_ROOT}"
+
+if ! docker info >/dev/null 2>&1; then
+  fail "docker not available"
+fi
+
 mkdir -p "${WORKDIR}"
 
 log "Work dir: ${WORKDIR}"
@@ -52,12 +102,10 @@ log "Work dir: ${WORKDIR}"
 } >"${WORKDIR}/MANIFEST.txt"
 
 if ! docker inspect "${DB_CONTAINER}" >/dev/null 2>&1; then
-  echo "[backup-stack] ERROR: container ${DB_CONTAINER} not found" >&2
-  exit 1
+  fail "container ${DB_CONTAINER} not found"
 fi
 
 log "Dumping PostgreSQL (${POSTGRES_DB})…"
-# Note: omit `docker exec -T` — older Docker engines on some VPS images reject `-T`.
 docker exec "${DB_CONTAINER}" pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" >"${WORKDIR}/postgres.sql"
 
 if [[ -n "${SAIREX_UPLOADS_PATH:-}" ]] && [[ -d "${SAIREX_UPLOADS_PATH}" ]]; then
@@ -85,9 +133,8 @@ for rel in infra/server/server.env.live infra/server/.env infra/server/docker-co
 done
 
 if [[ ! -s "${WORKDIR}/postgres.sql" ]]; then
-  echo "[backup-stack] ERROR: postgres.sql is empty" >&2
   rm -rf "${WORKDIR}"
-  exit 1
+  fail "postgres.sql is empty (pg_dump failed?)"
 fi
 
 log "Compressing archive…"
@@ -110,6 +157,12 @@ if [[ -n "${RCLONE_REMOTE_PATH:-}" ]]; then
   else
     log "WARN: RCLONE_REMOTE_PATH set but rclone not installed"
   fi
+fi
+
+write_status_json "success" "" "${ARCHIVE}"
+
+if [[ "${TELEGRAM_NOTIFY_SUCCESS:-}" == "true" ]]; then
+  notify "✅ SairexSMS stack backup OK: $(basename "${ARCHIVE}") ($(du -h "${ARCHIVE}" | cut -f1))"
 fi
 
 log "Done."

@@ -76,6 +76,8 @@ export interface NavItem {
   href: string;
   icon: string; // lucide icon name
   proOnly?: boolean;
+  /** Hidden unless platform SUPER_ADMIN (API may still enforce separately). */
+  superAdminOnly?: boolean;
 }
 
 export interface NavGroup {
@@ -132,6 +134,12 @@ export const navigation: NavGroup[] = [
     items: [
       { label: "Queues", href: "/admin/queues", icon: "Activity", proOnly: true },
       { label: "Job Monitor", href: "/admin/jobs", icon: "Activity", proOnly: true },
+      {
+        label: "Backups",
+        href: "/admin/backups",
+        icon: "Database",
+        superAdminOnly: true,
+      },
     ],
   },
   {

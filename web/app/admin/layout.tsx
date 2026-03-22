@@ -141,14 +141,16 @@ export default async function AdminLayout({
       : "Global";
   const simpleMode = isSimpleMode(orgMode.mode);
   const isSuperAdmin = user.platformRole === "SUPER_ADMIN" || user.role === "SUPER_ADMIN";
-  const filteredNavigation = simpleMode
-    ? navigation
-        .map((group) => ({
-          ...group,
-          items: group.items.filter((item) => isSuperAdmin || !item.proOnly),
-        }))
-        .filter((group) => group.items.length > 0)
-    : navigation;
+  const filteredNavigation = navigation
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => {
+        if (item.superAdminOnly && !isSuperAdmin) return false;
+        if (simpleMode) return isSuperAdmin || !item.proOnly;
+        return true;
+      }),
+    }))
+    .filter((group) => group.items.length > 0);
 
   const {
     topBarBackgroundColor,

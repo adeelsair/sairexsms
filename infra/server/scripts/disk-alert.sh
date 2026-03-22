@@ -9,6 +9,7 @@
 #
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 THRESHOLD_PERCENT="${THRESHOLD_PERCENT:-80}"
 
 # Parse `df -P` use% for mount point /
@@ -23,6 +24,7 @@ if (( pct >= THRESHOLD_PERCENT )); then
   echo "DISK ALERT: / is ${pct}% full (threshold ${THRESHOLD_PERCENT}%)"
   df -h /
   docker system df 2>/dev/null || true
+  "${SCRIPT_DIR}/telegram-notify.sh" "⚠️ SairexSMS disk alert: / is ${pct}% full on $(hostname 2>/dev/null) (threshold ${THRESHOLD_PERCENT}%)" || true
   exit 1
 fi
 

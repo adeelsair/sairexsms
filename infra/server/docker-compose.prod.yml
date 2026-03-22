@@ -63,6 +63,9 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    # Optional: SUPER_ADMIN "Stack backups" admin page — mount host archive dir read-only, set BACKUP_ARCHIVE_DIR in .env
+    # volumes:
+    #   - /home/sairex/sairex-stack-backups:/var/backups/sairex-stack:ro
     deploy:
       resources:
         limits:
