@@ -57,7 +57,8 @@ if ! docker inspect "${DB_CONTAINER}" >/dev/null 2>&1; then
 fi
 
 log "Dumping PostgreSQL (${POSTGRES_DB})…"
-docker exec -T "${DB_CONTAINER}" pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" >"${WORKDIR}/postgres.sql"
+# Note: omit `docker exec -T` — older Docker engines on some VPS images reject `-T`.
+docker exec "${DB_CONTAINER}" pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" >"${WORKDIR}/postgres.sql"
 
 if [[ -n "${SAIREX_UPLOADS_PATH:-}" ]] && [[ -d "${SAIREX_UPLOADS_PATH}" ]]; then
   log "Archiving uploads from ${SAIREX_UPLOADS_PATH}…"
