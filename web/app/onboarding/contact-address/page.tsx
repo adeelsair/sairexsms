@@ -77,7 +77,6 @@ function VerifyInline({
     if (otpSent) {
       setOtpSent(false);
       setOtp("");
-      setDevCode(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);

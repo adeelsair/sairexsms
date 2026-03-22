@@ -49,9 +49,9 @@ export async function resolveSessionContext(
   const membership =
     activeMembership ?? invitedMembership ?? user.memberships[0] ?? null;
 
-  let resolvedOrganizationId = membership?.organizationId ?? null;
-  let resolvedCampusId = membership?.campusId ?? null;
-  let resolvedMembershipId = membership?.id ?? null;
+  let resolvedOrganizationId: string | null = membership?.organizationId ?? null;
+  let resolvedCampusId: number | null = membership?.campusId ?? null;
+  let resolvedMembershipId: number | null = membership?.id ?? null;
   let resolvedOrganizationStructure =
     membership?.organization?.organizationStructure ?? null;
   let resolvedUnitPath = membership?.unitPath ?? null;

@@ -231,11 +231,13 @@ describeIfDb("finance reconciliation golden integration", () => {
   });
 
   it("covers partial, full, and idempotency duplicate protection", async () => {
+    if (!fixture) throw new Error("expected fixture from beforeEach");
+    const f = fixture;
     const paymentDate = new Date("2026-02-24T00:00:00.000Z");
 
     const partial = await reconcilePayment({
-      organizationId: fixture!.organizationId,
-      challanId: fixture!.challanId,
+      organizationId: f.organizationId,
+      challanId: f.challanId,
       amount: 400,
       paymentDate,
       paymentChannel: "OTC",
@@ -244,7 +246,7 @@ describeIfDb("finance reconciliation golden integration", () => {
     });
 
     const challanAfterPartial = await prisma.feeChallan.findUniqueOrThrow({
-      where: { id: fixture!.challanId },
+      where: { id: f.challanId },
       select: { status: true, paidAmount: true },
     });
 
@@ -253,8 +255,8 @@ describeIfDb("finance reconciliation golden integration", () => {
 
     const partialLedger = await prisma.ledgerEntry.findFirst({
       where: {
-        organizationId: fixture!.organizationId,
-        challanId: fixture!.challanId,
+        organizationId: f.organizationId,
+        challanId: f.challanId,
         entryType: "PAYMENT_RECEIVED",
         referenceId: partial.paymentRecordId,
       },
@@ -265,7 +267,7 @@ describeIfDb("finance reconciliation golden integration", () => {
     expect(Number(partialLedger!.amount)).toBe(400);
 
     const summaryAfterPartial = await prisma.studentFinancialSummary.findUniqueOrThrow({
-      where: { studentId: fixture.studentId },
+      where: { studentId: f.studentId },
       select: { balance: true, totalCredit: true },
     });
 
@@ -273,14 +275,14 @@ describeIfDb("finance reconciliation golden integration", () => {
     expect(Number(summaryAfterPartial.totalCredit)).toBe(400);
 
     const ledgerCountBeforeDuplicate = await prisma.ledgerEntry.count({
-      where: { challanId: fixture.challanId },
+      where: { challanId: f.challanId },
     });
     const balanceBeforeDuplicate = Number(summaryAfterPartial.balance);
 
     await expect(
       reconcilePayment({
-        organizationId: fixture!.organizationId,
-        challanId: fixture!.challanId,
+        organizationId: f.organizationId,
+        challanId: f.challanId,
         amount: 400,
         paymentDate,
         paymentChannel: "OTC",
@@ -290,10 +292,10 @@ describeIfDb("finance reconciliation golden integration", () => {
     ).rejects.toThrow(/Duplicate payment submission detected/);
 
     const ledgerCountAfterDuplicate = await prisma.ledgerEntry.count({
-      where: { challanId: fixture.challanId },
+      where: { challanId: f.challanId },
     });
     const summaryAfterDuplicate = await prisma.studentFinancialSummary.findUniqueOrThrow({
-      where: { studentId: fixture.studentId },
+      where: { studentId: f.studentId },
       select: { balance: true },
     });
 
@@ -301,8 +303,8 @@ describeIfDb("finance reconciliation golden integration", () => {
     expect(Number(summaryAfterDuplicate.balance)).toBe(balanceBeforeDuplicate);
 
     await reconcilePayment({
-      organizationId: fixture.organizationId,
-      challanId: fixture.challanId,
+      organizationId: f.organizationId,
+      challanId: f.challanId,
       amount: 600,
       paymentDate: new Date("2026-02-25T00:00:00.000Z"),
       paymentChannel: "BANK_TRANSFER",
@@ -311,16 +313,16 @@ describeIfDb("finance reconciliation golden integration", () => {
     });
 
     const challanAfterFull = await prisma.feeChallan.findUniqueOrThrow({
-      where: { id: fixture!.challanId },
+      where: { id: f.challanId },
       select: { status: true, paidAmount: true },
     });
 
     expect(challanAfterFull.status).toBe("PAID");
-    expect(Number(challanAfterFull.paidAmount)).toBe(fixture!.totalAmount);
+    expect(Number(challanAfterFull.paidAmount)).toBe(f.totalAmount);
 
     const ledgerTotals = await prisma.ledgerEntry.groupBy({
       by: ["direction"],
-      where: { challanId: fixture!.challanId },
+      where: { challanId: f.challanId },
       _sum: { amount: true },
     });
 
@@ -331,16 +333,16 @@ describeIfDb("finance reconciliation golden integration", () => {
       ledgerTotals.find((row) => row.direction === "CREDIT")?._sum.amount ?? 0,
     );
 
-    expect(debit).toBe(fixture!.totalAmount);
-    expect(credit).toBe(fixture!.totalAmount);
+    expect(debit).toBe(f.totalAmount);
+    expect(credit).toBe(f.totalAmount);
 
     const summaryAfterFull = await prisma.studentFinancialSummary.findUniqueOrThrow({
-      where: { studentId: fixture!.studentId },
+      where: { studentId: f.studentId },
       select: { balance: true, totalDebit: true, totalCredit: true },
     });
 
-    expect(Number(summaryAfterFull.totalDebit)).toBe(fixture!.totalAmount);
-    expect(Number(summaryAfterFull.totalCredit)).toBe(fixture!.totalAmount);
+    expect(Number(summaryAfterFull.totalDebit)).toBe(f.totalAmount);
+    expect(Number(summaryAfterFull.totalCredit)).toBe(f.totalAmount);
     expect(Number(summaryAfterFull.balance)).toBe(0);
   });
 

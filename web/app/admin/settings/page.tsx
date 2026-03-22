@@ -87,7 +87,7 @@ export default function SettingsPage() {
                 <KeyRound className="mt-0.5 h-4 w-4" />
                 Account security
               </span>
-              <SxStatusBadge variant="neutral">Password</SxStatusBadge>
+              <SxStatusBadge variant="muted">Password</SxStatusBadge>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -111,7 +111,7 @@ export default function SettingsPage() {
                     <Palette className="mt-0.5 h-4 w-4" />
                     Theme mode
                   </span>
-                  <SxStatusBadge variant="neutral">UI</SxStatusBadge>
+                  <SxStatusBadge variant="muted">UI</SxStatusBadge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -126,7 +126,7 @@ export default function SettingsPage() {
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-start justify-between gap-3 text-foreground">
                   <span>Organization mode</span>
-                  <SxStatusBadge variant={modeLoading ? "neutral" : currentMode ? "success" : "warning"}>
+                  <SxStatusBadge variant={modeLoading ? "muted" : currentMode ? "success" : "warning"}>
                     {modeLoading ? "Loading" : currentMode ?? "Unavailable"}
                   </SxStatusBadge>
                 </CardTitle>

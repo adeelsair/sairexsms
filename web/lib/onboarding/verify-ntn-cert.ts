@@ -155,7 +155,14 @@ export async function verifyNtnCertificate(
     const { getDocumentProxy, extractText } = await import("unpdf");
     const pdf = await getDocumentProxy(new Uint8Array(buffer));
     const result = await extractText(pdf, { mergePages: true });
-    text = typeof result.text === "string" ? result.text : (result.text ?? []).join(" ");
+    const extracted: unknown = result.text;
+    if (typeof extracted === "string") {
+      text = extracted;
+    } else if (Array.isArray(extracted)) {
+      text = extracted.map((part) => String(part)).join(" ");
+    } else {
+      text = "";
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("NTN certificate unpdf extract error:", message, err);
