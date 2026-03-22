@@ -117,8 +117,10 @@ Production hardening and **what to run on the server** (cron, disk alerts, SSH, 
 
 Helper scripts (copy with repo; `chmod +x` on the server):
 
+- **`infra/server/scripts/bootstrap-server-automation.sh`** — **one-command** safe cron/fail2ban/journal/nginx setup (see checklist).
 - **`infra/server/scripts/docker-prune-safe.sh`** — weekly Docker cleanup without touching volumes.
 - **`infra/server/scripts/disk-alert.sh`** — fail when `/` usage exceeds a threshold.
+- **`infra/server/scripts/nginx-reload-if-ok.sh`** — `nginx -t` + reload if nginx is present.
 
 ## HTTPS verification
 

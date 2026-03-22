@@ -211,6 +211,8 @@ Deploy fixes don’t stop the disk from filling again. Use:
 
 **Important:** Do **not** put `docker system prune -af --volumes` on a timer without expert review — volumes can hold irreplaceable data.
 
+**One-command server bootstrap (safe):** `infra/server/scripts/bootstrap-server-automation.sh` — see `docs/production-ops-checklist.md` §0.
+
 ## Phase D3 Step 3: Health Checks + Uptime Monitoring + Structured Logs
 
 Runtime monitoring is now wired in `infra/server/docker-compose.prod.yml`:

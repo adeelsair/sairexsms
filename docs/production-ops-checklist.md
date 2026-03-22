@@ -10,6 +10,44 @@ The codebase now includes **safer deploy ordering** (`infra/server/deploy-safe.s
 
 ---
 
+## 0. One-command bootstrap (recommended on VPS)
+
+After `git pull`, run **once** (adjust `SAIREX_REPO` if your path differs):
+
+```bash
+cd ~/SairexSMS
+chmod +x infra/server/scripts/bootstrap-server-automation.sh infra/server/scripts/nginx-reload-if-ok.sh
+SAIREX_REPO="$HOME/SairexSMS" bash infra/server/scripts/bootstrap-server-automation.sh --dry-run
+# Then (needs passwordless sudo OR run in an interactive root/sudo session):
+SAIREX_REPO="$HOME/SairexSMS" bash infra/server/scripts/bootstrap-server-automation.sh --all-safe
+```
+
+What **`--all-safe`** does:
+
+- Installs **`curl`**, **`ncdu`**, tries **`jq`**
+- Installs & starts **fail2ban**
+- Adds **`/etc/cron.weekly/sairex-journal-vacuum`** (`journalctl --vacuum-time=7d`)
+- Replaces your user crontab’s **managed block** (marked `# BEGIN sairex-automation` … `# END`) with:
+  - weekly **`docker-prune-safe.sh`**
+  - every 6h **`disk-alert.sh`**
+  - weekly **`nginx-reload-if-ok.sh`** (no-op if nginx not installed)
+
+**Not included by default (intentionally):**
+
+- **Docker `daemon.json` log limits** — opt-in:  
+  `ALLOW_DOCKER_RESTART=true` plus `--with-docker-logging` (restarts Docker → **brief downtime**).
+
+**Rejected patterns** (do **not** copy from random guides):
+
+| Pattern | Why |
+|--------|-----|
+| `docker system prune -af --volumes` on a timer | Can delete **volumes** → **data loss** |
+| `(crontab -l; echo line) \| crontab -` run repeatedly | **Duplicates** cron lines every run |
+| `docker update --restart` on **all** containers | Unpredictable; Compose already sets **`restart:`** |
+| User crontab `journalctl …` without `sudo` | Usually **fails silently** (no permission) |
+
+---
+
 ## 1. Safe Docker cleanup (mandatory)
 
 **Do not** schedule `docker system prune -af --volumes` blindly: `--volumes` can remove **unused** named volumes and has caused **data loss** in the wild. Postgres/Redis data lives on bind mounts today, but keep habits safe.
@@ -140,5 +178,7 @@ Tune jails for your SSH port if non-default.
 
 - `DEPLOYMENT.md` — deploy flow + “Reliable deploys”
 - `infra/server/README.md` — server layout
+- `infra/server/scripts/bootstrap-server-automation.sh` — idempotent cron + optional fail2ban/journal/nginx
 - `infra/server/scripts/docker-prune-safe.sh`
 - `infra/server/scripts/disk-alert.sh`
+- `infra/server/scripts/nginx-reload-if-ok.sh`
