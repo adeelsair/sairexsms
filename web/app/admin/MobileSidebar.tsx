@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/sheet";
 import { SidebarNav } from "./SidebarNav";
 import LogoutButton from "./LogoutButton";
+import { SairexMarketingBrandLink } from "@/components/sairex-marketing-brand-link";
 import { SxButton } from "@/components/sx";
 import type { NavGroup } from "@/lib/config/theme";
 import { SIDEBAR_BOTTOM_COLOR } from "@/lib/theme/chrome-theme";
@@ -54,14 +55,27 @@ export function MobileSidebar({
           {/* Brand */}
           <SheetHeader className="border-b border-sidebar-border px-6 py-5">
             <div className="w-full">
-              <Image
-                src={tenantLogoUrl}
-                alt="Tenant logo"
-                width={320}
-                height={88}
-                className={`h-auto w-full object-contain ${shouldRoundSairexLogo ? "rounded-md" : ""}`}
-                priority
-              />
+              {shouldRoundSairexLogo ? (
+                <SairexMarketingBrandLink className="block w-full">
+                  <Image
+                    src={tenantLogoUrl}
+                    alt="SairexSMS"
+                    width={320}
+                    height={88}
+                    className={`h-auto w-full object-contain ${shouldRoundSairexLogo ? "rounded-md" : ""}`}
+                    priority
+                  />
+                </SairexMarketingBrandLink>
+              ) : (
+                <Image
+                  src={tenantLogoUrl}
+                  alt="Organization logo"
+                  width={320}
+                  height={88}
+                  className="h-auto w-full object-contain"
+                  priority
+                />
+              )}
             </div>
             <SheetDescription className="text-xs font-semibold" style={{ color: SIDEBAR_BOTTOM_COLOR }}>
               {userRole.replace("_", " ")} Console

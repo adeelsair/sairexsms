@@ -1,6 +1,6 @@
+import { SairexMarketingBrandLink } from "@/components/sairex-marketing-brand-link";
 import { brand } from "@/lib/config/theme";
 import Image from "next/image";
-import Link from "next/link";
 import { getAdminChromeColors, SIDEBAR_MID_COLOR } from "@/lib/theme/chrome-theme";
 
 /**
@@ -26,7 +26,7 @@ export default function AuthLayout({
         }}
       >
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">
-          <Link href="/" aria-label="Go to SairexSMS landing page">
+          <SairexMarketingBrandLink aria-label="Go to SairexSMS website">
             <Image
               src="/sairex-logo.png"
               alt="SairexSMS"
@@ -35,7 +35,7 @@ export default function AuthLayout({
               className="h-10 w-auto rounded-md object-contain sm:h-11 md:h-14"
               priority
             />
-          </Link>
+          </SairexMarketingBrandLink>
           <p className="hidden text-xs font-medium opacity-90 sm:block">{brand.tagline}</p>
         </div>
       </header>

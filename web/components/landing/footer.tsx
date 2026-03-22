@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { SairexMarketingBrandLink } from "@/components/sairex-marketing-brand-link";
 import { getAdminChromeColors, SIDEBAR_MID_COLOR } from "@/lib/theme/chrome-theme";
 import { landingContent } from "./content";
 
@@ -18,13 +19,15 @@ export function LandingFooter() {
       <div className="mx-auto grid w-full max-w-7xl gap-10 px-4 py-14 md:px-6 lg:grid-cols-12">
         <div className="lg:col-span-4">
           <div className="rounded-2xl p-1">
-            <Image
-              src={landingContent.brand.logoSrc}
-              alt={landingContent.brand.logoAlt}
-              width={152}
-              height={40}
-              className="h-10 w-auto rounded-md object-contain"
-            />
+            <SairexMarketingBrandLink className="inline-block">
+              <Image
+                src={landingContent.brand.logoSrc}
+                alt={landingContent.brand.logoAlt}
+                width={152}
+                height={40}
+                className="h-10 w-auto rounded-md object-contain"
+              />
+            </SairexMarketingBrandLink>
             <p className="mt-4 max-w-sm text-sm opacity-85">
               School management and SMS automation for admissions, attendance, fee operations, and
               parent communication.

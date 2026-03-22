@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import { SairexMarketingBrandLink } from "@/components/sairex-marketing-brand-link";
 import { brand } from "@/lib/config/theme";
 import { getAdminChromeColors, SIDEBAR_MID_COLOR } from "@/lib/theme/chrome-theme";
 
@@ -32,7 +32,7 @@ export function OnboardingShell({
         }}
       >
         <div className="mx-auto flex w-full max-w-6xl items-center gap-4">
-          <Link href="/" aria-label="Go to SairexSMS landing page" className="shrink-0">
+          <SairexMarketingBrandLink aria-label="Go to SairexSMS website" className="shrink-0">
             <Image
               src="/sairex-logo.png"
               alt="SairexSMS"
@@ -41,7 +41,7 @@ export function OnboardingShell({
               className="h-10 w-auto rounded-md object-contain sm:h-11 md:h-14"
               priority
             />
-          </Link>
+          </SairexMarketingBrandLink>
           {progressNode ? (
             <div className="flex min-w-0 flex-1 items-center">
               <div className={maxWidth}>{progressNode}</div>

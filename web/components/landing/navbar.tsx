@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Menu } from "lucide-react";
+import { SairexMarketingBrandLink } from "@/components/sairex-marketing-brand-link";
 import { SxButton } from "@/components/sx";
 import {
   Sheet,
@@ -59,7 +60,7 @@ export function LandingNavbar({ variant = "marketing" }: { variant?: LandingNavb
     >
       <nav className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-3 px-4 md:px-6">
         <div className="flex items-center gap-4">
-          <Link href="/" className="flex items-center gap-3">
+          <SairexMarketingBrandLink className="flex items-center gap-3">
             <Image
               src={landingContent.brand.logoSrc}
               alt={landingContent.brand.logoAlt}
@@ -68,15 +69,7 @@ export function LandingNavbar({ variant = "marketing" }: { variant?: LandingNavb
               className="h-10 w-auto rounded-md object-contain sm:h-11 md:h-12"
               priority
             />
-          </Link>
-          {variant === "app" && process.env.NEXT_PUBLIC_MARKETING_SITE_URL ? (
-            <a
-              href={process.env.NEXT_PUBLIC_MARKETING_SITE_URL}
-              className="hidden text-sm opacity-80 transition-opacity hover:opacity-100 sm:inline"
-            >
-              Website
-            </a>
-          ) : null}
+          </SairexMarketingBrandLink>
         </div>
 
         {variant === "marketing" ? (
@@ -156,19 +149,6 @@ export function LandingNavbar({ variant = "marketing" }: { variant?: LandingNavb
                       </a>
                     </SheetClose>
                   ))}
-                </div>
-              ) : null}
-
-              {variant === "app" && process.env.NEXT_PUBLIC_MARKETING_SITE_URL ? (
-                <div className="border-b border-border p-4">
-                  <SheetClose asChild>
-                    <a
-                      href={process.env.NEXT_PUBLIC_MARKETING_SITE_URL}
-                      className="block rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
-                    >
-                      Website
-                    </a>
-                  </SheetClose>
                 </div>
               ) : null}
 

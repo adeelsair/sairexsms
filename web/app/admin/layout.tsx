@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import { SairexMarketingBrandLink } from "@/components/sairex-marketing-brand-link";
 import { navigation } from "@/lib/config/theme";
 import { isSimpleMode, resolveOrganizationMode } from "@/lib/system/mode.service";
 import { prisma } from "@/lib/prisma";
@@ -163,14 +164,16 @@ export default async function AdminLayout({
       {/* ── Mobile top bar ──────────────────────────────────── */}
       <header className="flex items-center justify-between border-b border-sidebar-border bg-sidebar px-4 py-3 md:hidden">
         <div className="flex items-center">
-          <Image
-            src={sidebarLogoUrl}
-            alt="Tenant logo"
-            width={168}
-            height={44}
-            className={`h-11 w-auto object-contain ${shouldRoundSairexLogo ? "rounded-md" : ""}`}
-            priority
-          />
+          <SairexMarketingBrandLink>
+            <Image
+              src={sidebarLogoUrl}
+              alt="SairexSMS"
+              width={168}
+              height={44}
+              className={`h-11 w-auto object-contain ${shouldRoundSairexLogo ? "rounded-md" : ""}`}
+              priority
+            />
+          </SairexMarketingBrandLink>
         </div>
         <MobileSidebar
           groups={filteredNavigation}
@@ -186,14 +189,16 @@ export default async function AdminLayout({
         {/* Brand */}
         <div className="border-b border-sidebar-border px-6 py-5">
           <div className="mb-2 w-full">
-            <Image
-              src={sidebarLogoUrl}
-              alt="Tenant logo"
-              width={320}
-              height={88}
-              className={`h-auto w-full object-contain ${shouldRoundSairexLogo ? "rounded-md" : ""}`}
-              priority
-            />
+            <SairexMarketingBrandLink className="block w-full">
+              <Image
+                src={sidebarLogoUrl}
+                alt="SairexSMS"
+                width={320}
+                height={88}
+                className={`h-auto w-full object-contain ${shouldRoundSairexLogo ? "rounded-md" : ""}`}
+                priority
+              />
+            </SairexMarketingBrandLink>
           </div>
           <p className="mt-0.5 text-xs font-semibold" style={{ color: SIDEBAR_BOTTOM_COLOR }}>
             {userRole} Console
@@ -289,15 +294,29 @@ export default async function AdminLayout({
                   />
                 </Link>
               ) : null}
-              <Image
-                src={topBarLogoUrl}
-                alt="Tenant logo"
-                width={128}
-                height={32}
-                className={`h-8 w-auto object-contain ${
-                  shouldRoundTopBarLogo ? "rounded-md" : ""
-                }`}
-              />
+              {topBarLogoUrl.startsWith("/sairex-logo") ? (
+                <SairexMarketingBrandLink>
+                  <Image
+                    src={topBarLogoUrl}
+                    alt="SairexSMS"
+                    width={128}
+                    height={32}
+                    className={`h-8 w-auto object-contain ${
+                      shouldRoundTopBarLogo ? "rounded-md" : ""
+                    }`}
+                  />
+                </SairexMarketingBrandLink>
+              ) : (
+                <Image
+                  src={topBarLogoUrl}
+                  alt="Organization logo"
+                  width={128}
+                  height={32}
+                  className={`h-8 w-auto object-contain ${
+                    shouldRoundTopBarLogo ? "rounded-md" : ""
+                  }`}
+                />
+              )}
             </div>
           </div>
         </div>
