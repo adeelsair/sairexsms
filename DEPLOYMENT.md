@@ -178,6 +178,29 @@ Restore pattern:
 cat /opt/sairex/backups/db_YYYYMMDD_HHMMSS.sql | docker compose exec -T db psql -U sairex -d sairex
 ```
 
+## Reliable deploys (Postgres / Redis / login)
+
+GitHub deploy uses `infra/server/deploy-safe.sh`. These behaviors prevent **“login works, then breaks after the next deploy”**:
+
+1. **Do not recycle DB/Redis on every release**  
+   Older `deploy-safe.sh` defaulted to removing `sairex_db` / `sairex_redis` before backup when `AUTO_CLEAN_CONFLICTS=true`, which **restarts Postgres into crash recovery** and **Redis cold start** on every push. That window looks like random login/API failure but is infra timing.  
+   **Fix:** `AUTO_CLEAN_DATA_SERVICES` now defaults to `false`. Only set `AUTO_CLEAN_DATA_SERVICES=true` on the server when you truly need to delete conflicting containers (rare).
+
+2. **Wait until Postgres accepts connections**  
+   `deploy-safe.sh` now loops on `pg_isready` (configurable via `POSTGRES_READY_MAX_CHECKS` / `POSTGRES_READY_SLEEP_SECONDS`) after `db` is running.
+
+3. **Wait until Redis answers `PING`**  
+   Same script waits for `redis-cli ping` (`REDIS_READY_MAX_CHECKS` / `REDIS_READY_SLEEP_SECONDS`).
+
+4. **Compose startup order**  
+   `docker-compose.prod.yml` defines **healthchecks** for `db` and `redis`, and `migrate` / `app` / `worker` / `sms_worker` use `depends_on: condition: service_healthy` so the app does not start while Postgres is still recovering.
+
+5. **Redis RDB snapshot failures**  
+   Production Redis now runs with **`--appendonly yes` and `--save ""`** (AOF only, no periodic RDB). That avoids the common `MISCONF` / `stop-writes-on-bgsave-error` outage when the disk is tight or RDB write fails (sessions/queues stop accepting writes → login/session breaks).
+
+6. **Migrations**  
+   `docker compose run --rm migrate` is used **without** `--no-deps` so Compose waits for the database healthcheck before `prisma migrate deploy` runs.
+
 ## Phase D3 Step 3: Health Checks + Uptime Monitoring + Structured Logs
 
 Runtime monitoring is now wired in `infra/server/docker-compose.prod.yml`:

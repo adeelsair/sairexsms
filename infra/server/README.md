@@ -101,6 +101,14 @@ SAIREX_IMAGE=ghcr.io/<owner>/sairexsms-ops:sha-<short-sha>
 5. `docker image prune -f`
 6. Delete backups older than `BACKUP_RETENTION_DAYS`
 
+**GitHub Actions production deploy** uses `infra/server/deploy-safe.sh` from the repo (not necessarily `/opt/sairex/deploy.sh`). That script:
+
+- Defaults **`AUTO_CLEAN_DATA_SERVICES=false`** so **db/redis containers are not removed on every release** (avoids Postgres recovery + Redis cold start taking the API down).
+- Waits for **`pg_isready`** and **Redis `PING`** before backup/migrate.
+- Uses **`docker compose run --rm migrate`** without `--no-deps` so migrations run only after the DB healthcheck passes.
+
+See `DEPLOYMENT.md` → **Reliable deploys** for details. Set `AUTO_CLEAN_DATA_SERVICES=true` only when fixing a one-off container name conflict.
+
 ## HTTPS verification
 
 After the first secure boot (30-60s):

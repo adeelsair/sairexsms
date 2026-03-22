@@ -11,10 +11,17 @@ RUN_MIGRATIONS="${RUN_MIGRATIONS:-true}"
 CREATE_DB_BACKUP="${CREATE_DB_BACKUP:-true}"
 UP_NO_DEPS="${UP_NO_DEPS:-true}"
 AUTO_CLEAN_CONFLICTS="${AUTO_CLEAN_CONFLICTS:-true}"
+# NEVER default to true: removing db/redis containers every deploy forces Postgres recovery
+# and Redis restarts — users see login/API failures until recovery finishes.
+AUTO_CLEAN_DATA_SERVICES="${AUTO_CLEAN_DATA_SERVICES:-false}"
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-7}"
 BACKUP_DIR="${BACKUP_DIR:-/opt/sairex/backups}"
 POSTGRES_USER="${POSTGRES_USER:-sairex}"
 POSTGRES_DB="${POSTGRES_DB:-sairex}"
+POSTGRES_READY_MAX_CHECKS="${POSTGRES_READY_MAX_CHECKS:-90}"
+POSTGRES_READY_SLEEP_SECONDS="${POSTGRES_READY_SLEEP_SECONDS:-2}"
+REDIS_READY_MAX_CHECKS="${REDIS_READY_MAX_CHECKS:-60}"
+REDIS_READY_SLEEP_SECONDS="${REDIS_READY_SLEEP_SECONDS:-2}"
 APP_HEALTH_MAX_CHECKS="${APP_HEALTH_MAX_CHECKS:-40}"
 APP_HEALTH_SLEEP_SECONDS="${APP_HEALTH_SLEEP_SECONDS:-5}"
 APP_LOG_TAIL_LINES="${APP_LOG_TAIL_LINES:-200}"
@@ -67,7 +74,9 @@ auto_clean_conflicts_for_app_services() {
 }
 
 auto_clean_conflicts_for_data_services() {
+  [[ "${AUTO_CLEAN_DATA_SERVICES}" == "true" ]] || return 0
   [[ "${AUTO_CLEAN_CONFLICTS}" == "true" ]] || return 0
+  echo "AUTO_CLEAN_DATA_SERVICES=true: removing db/redis containers if present (use only to fix name conflicts)."
   remove_container_if_exists "${DB_CONTAINER_NAME}"
   remove_container_if_exists "${REDIS_CONTAINER_NAME}"
 }
@@ -101,7 +110,40 @@ ensure_core_services() {
     return 1
   }
 
+  wait_for_postgres_accepting_connections || return 1
+  wait_for_redis_responding || return 1
+
   echo "Core services are running."
+}
+
+wait_for_postgres_accepting_connections() {
+  echo "Waiting for PostgreSQL to accept connections (pg_isready)..."
+  for ((i = 1; i <= POSTGRES_READY_MAX_CHECKS; i++)); do
+    if compose_cmd exec -T db pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" >/dev/null 2>&1; then
+      echo "PostgreSQL is ready (${i}/${POSTGRES_READY_MAX_CHECKS})."
+      return 0
+    fi
+    echo "PostgreSQL not ready yet (${i}/${POSTGRES_READY_MAX_CHECKS})..."
+    sleep "${POSTGRES_READY_SLEEP_SECONDS}"
+  done
+  echo "PostgreSQL did not become ready in time." >&2
+  compose_cmd logs --tail 80 db 2>/dev/null || true
+  return 1
+}
+
+wait_for_redis_responding() {
+  echo "Waiting for Redis to respond (PING)..."
+  for ((i = 1; i <= REDIS_READY_MAX_CHECKS; i++)); do
+    if compose_cmd exec -T redis redis-cli ping 2>/dev/null | grep -q PONG; then
+      echo "Redis is ready (${i}/${REDIS_READY_MAX_CHECKS})."
+      return 0
+    fi
+    echo "Redis not ready yet (${i}/${REDIS_READY_MAX_CHECKS})..."
+    sleep "${REDIS_READY_SLEEP_SECONDS}"
+  done
+  echo "Redis did not become ready in time." >&2
+  compose_cmd logs --tail 80 redis 2>/dev/null || true
+  return 1
 }
 
 print_app_diagnostics() {
@@ -224,7 +266,8 @@ fi
 
 if [[ "${RUN_MIGRATIONS}" == "true" ]]; then
   echo "Running migrations..."
-  compose_cmd run --rm --no-deps migrate
+  # Omit --no-deps so Compose waits for db healthcheck before migrate runs.
+  compose_cmd run --rm migrate
 fi
 
 echo "Starting updated services..."
