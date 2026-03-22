@@ -27,6 +27,15 @@ export const landingContent = {
       signupLabel: "Start Free Trial",
     },
   },
+  /** App host `/` — same brand as marketing, entry-only. */
+  appEntry: {
+    title: "Access your school workspace",
+    subtitle:
+      "Sign in to your dashboard, or create a new school account to get started.",
+    audienceLine: "Secure school management and SMS automation — same product you see on our website.",
+    primaryCta: { label: "Login", href: "/login" },
+    secondaryCta: { label: "Start free trial", href: "/signup" },
+  },
   hero: {
     title: "School Management & SMS Automation Platform",
     subtitle:

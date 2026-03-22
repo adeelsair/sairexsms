@@ -18,7 +18,9 @@ import { getAdminChromeColors, SIDEBAR_MID_COLOR } from "@/lib/theme/chrome-them
 import { landingContent } from "./content";
 import { getLandingButtonThemeStyles } from "./button-theme";
 
-export function LandingNavbar() {
+export type LandingNavbarVariant = "marketing" | "app";
+
+export function LandingNavbar({ variant = "marketing" }: { variant?: LandingNavbarVariant }) {
   const [scrolled, setScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { topBarBackgroundColor, topBarTextColor, bottomBarBackgroundColor } = getAdminChromeColors();
@@ -56,28 +58,40 @@ export function LandingNavbar() {
       }}
     >
       <nav className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-3 px-4 md:px-6">
-        <Link href="/" className="flex items-center gap-3">
-          <Image
-            src={landingContent.brand.logoSrc}
-            alt={landingContent.brand.logoAlt}
-            width={184}
-            height={48}
-            className="h-10 w-auto rounded-md object-contain sm:h-11 md:h-12"
-            priority
-          />
-        </Link>
-
-        <div className="hidden items-center gap-6 md:flex">
-          {landingContent.nav.items.map((item) => (
+        <div className="flex items-center gap-4">
+          <Link href="/" className="flex items-center gap-3">
+            <Image
+              src={landingContent.brand.logoSrc}
+              alt={landingContent.brand.logoAlt}
+              width={184}
+              height={48}
+              className="h-10 w-auto rounded-md object-contain sm:h-11 md:h-12"
+              priority
+            />
+          </Link>
+          {variant === "app" && process.env.NEXT_PUBLIC_MARKETING_SITE_URL ? (
             <a
-              key={item.label}
-              href={item.href}
-              className="text-sm opacity-80 transition-opacity hover:opacity-100"
+              href={process.env.NEXT_PUBLIC_MARKETING_SITE_URL}
+              className="hidden text-sm opacity-80 transition-opacity hover:opacity-100 sm:inline"
             >
-              {item.label}
+              Website
             </a>
-          ))}
+          ) : null}
         </div>
+
+        {variant === "marketing" ? (
+          <div className="hidden items-center gap-6 md:flex">
+            {landingContent.nav.items.map((item) => (
+              <a
+                key={item.label}
+                href={item.href}
+                className="text-sm opacity-80 transition-opacity hover:opacity-100"
+              >
+                {item.label}
+              </a>
+            ))}
+          </div>
+        ) : null}
 
         <div className="hidden items-center gap-2 md:flex">
           <SxButton
@@ -123,21 +137,40 @@ export function LandingNavbar() {
             <SheetContent side="right" className="w-[85vw] border-border p-0 sm:max-w-sm">
               <SheetHeader className="border-b border-border p-4">
                 <SheetTitle>Menu</SheetTitle>
-                <SheetDescription>Navigate SairexSMS and start your free trial.</SheetDescription>
+                <SheetDescription>
+                  {variant === "app"
+                    ? "Sign in or create your school account."
+                    : "Navigate SairexSMS and start your free trial."}
+                </SheetDescription>
               </SheetHeader>
 
-              <div className="space-y-1 p-4">
-                {landingContent.nav.items.map((item) => (
-                  <SheetClose key={item.label} asChild>
+              {variant === "marketing" ? (
+                <div className="space-y-1 p-4">
+                  {landingContent.nav.items.map((item) => (
+                    <SheetClose key={item.label} asChild>
+                      <a
+                        href={item.href}
+                        className="block rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+                      >
+                        {item.label}
+                      </a>
+                    </SheetClose>
+                  ))}
+                </div>
+              ) : null}
+
+              {variant === "app" && process.env.NEXT_PUBLIC_MARKETING_SITE_URL ? (
+                <div className="border-b border-border p-4">
+                  <SheetClose asChild>
                     <a
-                      href={item.href}
+                      href={process.env.NEXT_PUBLIC_MARKETING_SITE_URL}
                       className="block rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
                     >
-                      {item.label}
+                      Website
                     </a>
                   </SheetClose>
-                ))}
-              </div>
+                </div>
+              ) : null}
 
               <div className="mt-auto space-y-3 border-t border-border p-4">
                 <SheetClose asChild>
