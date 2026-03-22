@@ -109,6 +109,17 @@ SAIREX_IMAGE=ghcr.io/<owner>/sairexsms-ops:sha-<short-sha>
 
 See `DEPLOYMENT.md` → **Reliable deploys** for details. Set `AUTO_CLEAN_DATA_SERVICES=true` only when fixing a one-off container name conflict.
 
+## Operations (disk, cron, security)
+
+Production hardening and **what to run on the server** (cron, disk alerts, SSH, fail2ban, stash cleanup) lives in:
+
+- **`docs/production-ops-checklist.md`**
+
+Helper scripts (copy with repo; `chmod +x` on the server):
+
+- **`infra/server/scripts/docker-prune-safe.sh`** — weekly Docker cleanup without touching volumes.
+- **`infra/server/scripts/disk-alert.sh`** — fail when `/` usage exceeds a threshold.
+
 ## HTTPS verification
 
 After the first secure boot (30-60s):

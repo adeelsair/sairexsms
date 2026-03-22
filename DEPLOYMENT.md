@@ -201,6 +201,16 @@ GitHub deploy uses `infra/server/deploy-safe.sh`. These behaviors prevent **“l
 6. **Migrations**  
    `docker compose run --rm migrate` is used **without** `--no-deps` so Compose waits for the database healthcheck before `prisma migrate deploy` runs.
 
+### Disk + Docker growth (prevent repeat outages)
+
+Deploy fixes don’t stop the disk from filling again. Use:
+
+- **`docs/production-ops-checklist.md`** — monitoring, cron, SSH, fail2ban, stash hygiene.
+- **`infra/server/scripts/docker-prune-safe.sh`** — **safe** weekly prune (**no** `prune --volumes` in cron).
+- **`infra/server/scripts/disk-alert.sh`** — alert when `/` crosses a threshold (e.g. 80%).
+
+**Important:** Do **not** put `docker system prune -af --volumes` on a timer without expert review — volumes can hold irreplaceable data.
+
 ## Phase D3 Step 3: Health Checks + Uptime Monitoring + Structured Logs
 
 Runtime monitoring is now wired in `infra/server/docker-compose.prod.yml`:
