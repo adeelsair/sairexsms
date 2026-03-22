@@ -150,33 +150,33 @@ Notes:
 - `publish-image.yml` is kept for tag/manual publishing (release tags)
 - `deploy.yml` handles continuous delivery from default branches
 
-## Phase D3 Step 2: Automated Pre-Deploy Database Backup
+## Phase D3 Step 2: Database backup (pre-deploy + full DR)
 
-Deploy script now includes automated Postgres backup before pulling images:
+**Fast pre-deploy snapshot (SQL only)** — `infra/server/deploy-safe.sh` (GitHub deploy) and template `infra/server/deploy.sh`:
 
-- `infra/server/deploy.sh`
+1. Create `db_<timestamp>.sql` under `BACKUP_DIR` (often `APP_DIR/backups` or `/opt/sairex/backups`) when `CREATE_DB_BACKUP=true`.
+2. Then pull image, migrate, restart app/workers.
+3. Prune old `db_*.sql` files older than `BACKUP_RETENTION_DAYS` (default `7`).
 
-Implemented behavior:
+**Full stack disaster-recovery bundle** (Postgres + Redis `/data` + config copies + optional `rclone`):
 
-1. Create timestamped backup file:
-   - `/opt/sairex/backups/db_<timestamp>.sql`
-2. Pull new image tags
-3. Run migration job
-4. Restart app + worker
-5. Prune dangling images
-6. Remove old backups older than `BACKUP_RETENTION_DAYS` (default: `7`)
+- **`infra/server/scripts/backup-stack.sh`**
+- **`infra/server/scripts/restore-stack.sh`** (destructive — requires explicit env confirms)
+- Canonical doc: **`docs/backup-restore.md`**
 
-Config knobs:
+Config knobs (pre-deploy SQL):
 
 - `POSTGRES_USER` (default `sairex`)
 - `POSTGRES_DB` (default `sairex`)
 - `BACKUP_RETENTION_DAYS` (default `7`)
 
-Restore pattern:
+Restore **single SQL dump** (non-empty DB may need manual cleanup first):
 
 ```bash
 cat /opt/sairex/backups/db_YYYYMMDD_HHMMSS.sql | docker compose exec -T db psql -U sairex -d sairex
 ```
+
+Full archive restore: see **`docs/backup-restore.md`**.
 
 ## Reliable deploys (Postgres / Redis / login)
 

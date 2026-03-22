@@ -90,6 +90,15 @@ To pin deterministic rollback, set:
 SAIREX_IMAGE=ghcr.io/<owner>/sairexsms-ops:sha-<short-sha>
 ```
 
+## Backup & restore (DR)
+
+See **`docs/backup-restore.md`**:
+
+- **`scripts/backup-stack.sh`** — Postgres + Redis + config archive (optional `rclone`).
+- **`scripts/restore-stack.sh`** — destructive restore (guarded by env vars).
+
+Pre-deploy **SQL-only** snapshots remain in **`deploy-safe.sh`**.
+
 ## Deploy lifecycle
 
 `deploy.sh` runs a tenant-safe release order:

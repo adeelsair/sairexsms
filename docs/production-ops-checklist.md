@@ -154,12 +154,13 @@ Tune jails for your SSH port if non-default.
 
 ---
 
-## 7. Backups (already partially automated)
+## 7. Backups & disaster recovery
 
-`deploy-safe.sh` can create DB dumps before deploy. Also:
-
-- Verify **backup directory** has space and retention (`BACKUP_RETENTION_DAYS`).
-- Periodically **test restore** on a non-prod machine.
+- **Pre-deploy:** `deploy-safe.sh` writes **`db_*.sql`** before migrate (fast rollback snapshot).
+- **Daily / DR bundle:** **`infra/server/scripts/backup-stack.sh`** → compressed archive (Postgres + Redis + configs); optional **`rclone`**. See **`docs/backup-restore.md`**.
+- **Restore:** **`restore-stack.sh`** — requires **`CONFIRM=YES_I_WILL_LOSE_CURRENT_DATA`** and **`FRESH_DATABASE_RESTORE=true`** (drops DB).
+- Copy archives **off-server** (`rclone`, object storage, or `scp`) — disk on the VPS is not sufficient DR.
+- Verify **backup directory** free space and retention; **test restore** on a non-prod machine yearly.
 
 ---
 
@@ -182,3 +183,4 @@ Tune jails for your SSH port if non-default.
 - `infra/server/scripts/docker-prune-safe.sh`
 - `infra/server/scripts/disk-alert.sh`
 - `infra/server/scripts/nginx-reload-if-ok.sh`
+- `docs/backup-restore.md` — backup-stack / restore-stack / cron / rclone

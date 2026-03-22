@@ -4,3 +4,6 @@ node_modules
 .env.production
 
 /generated/prisma
+
+# Local DB dumps and restore experiments (use infra/server/scripts/backup-stack.sh)
+/backups/
