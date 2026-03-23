@@ -47,6 +47,19 @@ Also set:
 - `TRAEFIK_ACME_EMAIL` (email for Let's Encrypt registration)
 - `BACKUP_RETENTION_DAYS` (default `7`)
 
+### Cloudflare R2 (object storage)
+
+Default bucket name in `.env.example` is **`sairexsmsr2`**. Set:
+
+- `S3_ENDPOINT` — from R2 → **S3 API** (ends with `.r2.cloudflarestorage.com`)
+- `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` — R2 API token
+- `AWS_S3_BUCKET=sairexsmsr2`, `AWS_REGION=auto`
+
+Optional: `NEXT_PUBLIC_CDN_URL` — public origin for **logos** (custom domain on the bucket).  
+Certificates use **signed URLs** and stay private in the bucket.
+
+See **`docs/object-storage.md`**, **`docs/r2-server-setup.md`**, **`web/lib/storage/README.md`**, and paste-ready **`infra/server/snippets/r2-object-storage.env`**.
+
 4. Copy deploy script:
 
 ```bash

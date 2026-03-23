@@ -27,8 +27,6 @@ import {
   BarChart3,
   Settings,
   MessageSquare,
-  Archive,
-  Database,
 } from "lucide-react";
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
@@ -53,8 +51,6 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
   BarChart3,
   Settings,
   MessageSquare,
-  Archive,
-  Database,
 };
 
 interface SidebarNavProps {

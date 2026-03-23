@@ -9,6 +9,7 @@ import { ArrowLeft, Check, Eye, FileText, Pencil, X } from "lucide-react";
 import { z } from "zod";
 
 import { api } from "@/lib/api-client";
+import { parseStoredObjectRef } from "@/lib/storage";
 import {
   onboardingBrandingSchema,
   onboardingContactAddressSchema,
@@ -84,7 +85,60 @@ function humanizeKey(key: string): string {
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/_/g, " ")
     .toLowerCase()
-    .replace(/\\b\\w/g, (c) => c.toUpperCase());
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** `window.open(data:...)` often shows a blank tab; blob URLs work reliably for PDFs/images. */
+function dataUrlToBlob(dataUrl: string): Blob | null {
+  const trimmed = dataUrl.trim();
+  const base64Match = trimmed.match(/^data:([^;]+);base64,([\s\S]+)$/);
+  if (base64Match) {
+    const mime = base64Match[1];
+    const b64 = base64Match[2].replace(/\s/g, "");
+    try {
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return new Blob([bytes], { type: mime });
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function openLegalCertificateInNewTab(url: string): void {
+  const trimmed = url.trim();
+  if (!trimmed) return;
+
+  if (trimmed.startsWith("data:")) {
+    const blob = dataUrlToBlob(trimmed);
+    if (!blob) {
+      toast.error("Could not open this certificate (invalid data URL).");
+      return;
+    }
+    const objectUrl = URL.createObjectURL(blob);
+    if (!window.open(objectUrl, "_blank", "noopener,noreferrer")) {
+      URL.revokeObjectURL(objectUrl);
+      toast.error("Popup blocked — allow popups for this site to view the certificate.");
+      return;
+    }
+    // PDF viewers may not fire `load` reliably; revoke after a delay to free memory.
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 300_000);
+    return;
+  }
+
+  const absolute =
+    trimmed.startsWith("http://") || trimmed.startsWith("https://")
+      ? trimmed
+      : trimmed.startsWith("/")
+        ? `${window.location.origin}${trimmed}`
+        : trimmed;
+
+  const win = window.open(absolute, "_blank", "noopener,noreferrer");
+  if (!win) {
+    toast.error("Popup blocked — allow popups for this site to view the certificate.");
+  }
 }
 
 function inferInputType(section: SectionKey, fieldKey: string): "text" | "email" | "url" | "date" | "textarea" {
@@ -103,10 +157,12 @@ function CertificateRow({
   label,
   name,
   url,
+  certificateKind,
 }: {
   label: string;
   name: string | null;
   url: string | null;
+  certificateKind: "registration" | "ntn";
 }) {
   const hasUrl = Boolean(url);
   return (
@@ -123,9 +179,23 @@ function CertificateRow({
         size="sm"
         icon={<Eye size={14} />}
         disabled={!hasUrl}
-        onClick={() => {
+        onClick={async () => {
           if (!url) return;
-          window.open(url, "_blank", "noopener,noreferrer");
+          const parsed = parseStoredObjectRef(url);
+          if (parsed?.kind === "object-key") {
+            const result = await api.get<{ url: string }>(
+              `/api/admin/legal-certificates/signed-url?kind=${certificateKind}`,
+            );
+            if (!result.ok) {
+              toast.error(result.error);
+              return;
+            }
+            if (!window.open(result.data.url, "_blank", "noopener,noreferrer")) {
+              toast.error("Popup blocked — allow popups for this site to view the certificate.");
+            }
+            return;
+          }
+          openLegalCertificateInNewTab(url);
         }}
         className="shrink-0"
       >
@@ -431,11 +501,13 @@ export default function SettingsProfilePage() {
                           label="Registration Certificate"
                           name={legalCertificates?.registration.name ?? null}
                           url={legalCertificates?.registration.url ?? null}
+                          certificateKind="registration"
                         />
                         <CertificateRow
                           label="NTN Certificate"
                           name={legalCertificates?.ntn.name ?? null}
                           url={legalCertificates?.ntn.url ?? null}
+                          certificateKind="ntn"
                         />
                       </div>
                     </div>

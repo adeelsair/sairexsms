@@ -25,53 +25,7 @@ Legacy root scripts (`backup.sh`, `system_backup.py`, `phase3-backup.ps1`) were 
 Output: `~/sairex-stack-backups/sairex-stack-YYYYMMDD_HHMMSS.tar.gz`  
 Retention: `RETENTION_DAYS` (default **14**), same directory.
 
-Each run also writes **`backup-last-run.json`** in the backup directory (status, timestamp, errors). The admin **System → Backups** page reads this file plus archive metadata (no download of `.tar.gz` through the app).
-
----
-
-## Admin dashboard (`/admin/backups`)
-
-**SUPER_ADMIN only** (sidebar: **System → Backups**). Lists `sairex-stack-*.tar.gz` (name, size, modified time), shows the latest `backup-last-run.json`, optional **disk usage** for the app container (`fs.statfs`), and warnings when:
-
-- the last run **failed**,
-- there is **no archive** in the directory,
-- the newest archive is **older than ~26 hours** (stale cron / failed job), or
-- disk use on the checked path is **≥ 80%** (aligned with `disk-alert.sh`).
-
-### Why Next.js API routes (not `apps/api` Express)
-
-SairexSMS admin already authenticates via **Next.js** (`requireAuth` / `requireRole`). The backup dashboard is implemented as **`GET /api/admin/backups`** plus `web/lib/server/backup-dashboard.ts` so there is a **single** secured surface and no duplicate Express router to keep in sync. The separate **`apps/api`** service is for payments/SMS workers, not this UI.
-
-**Legacy:** `GET /api/admin/stack-backups` and `/admin/stack-backups` still work (alias / redirect).
-
-**Not exposed over HTTP:** one-click “run backup”, restore, or archive download — those belong on the host (cron, SSH, `restore-stack.sh`) to avoid long-running or destructive actions from a browser session.
-
-### App container configuration
-
-1. On the host, keep archives in a single directory (same as `BACKUP_ROOT` in `backup-stack.sh`, e.g. `~/sairex-stack-backups`).
-2. Mount that directory into the **`app`** service **read-only**.
-3. Set on the app process (e.g. in `infra/server/.env` loaded by Compose):
-
-| Variable | Purpose |
-|----------|---------|
-| `BACKUP_ARCHIVE_DIR` | **Required** for the dashboard — absolute path **inside the container** to the mounted backup folder. |
-| `BACKUP_STATUS_FILE` | Optional. Defaults to `{BACKUP_ARCHIVE_DIR}/backup-last-run.json`. |
-| `BACKUP_DISK_STAT_PATH` | Optional. Path for `statfs` disk widget (default **`/`**). Use the mount you care about (often root FS on the VPS). |
-
-Example Compose snippet (paths on host vary):
-
-```yaml
-# under services.app:
-volumes:
-  - /home/sairex/sairex-stack-backups:/var/backups/sairex-stack:ro
-```
-
-```bash
-BACKUP_ARCHIVE_DIR=/var/backups/sairex-stack
-# BACKUP_DISK_STAT_PATH=/
-```
-
-API: **`GET /api/admin/backups`** (same auth as the page). Restore stays **CLI-only** (`restore-stack.sh` with explicit confirmation env vars).
+Each run also writes **`backup-last-run.json`** in the backup directory (status, timestamp, errors) for your own monitoring or scripts.
 
 ---
 

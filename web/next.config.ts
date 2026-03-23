@@ -5,6 +5,14 @@ import { fileURLToPath } from "node:url";
 
 const configDir = path.dirname(fileURLToPath(import.meta.url));
 
+/** BullMQ imports `ioredis/built/utils`; when Next marks `ioredis` external, Node cannot resolve that subpath. */
+const ioredisBuiltUtilsWebpack = path.join(configDir, "node_modules", "ioredis", "built", "utils", "index.js");
+/**
+ * Turbopack rejects Windows absolute paths in resolveAlias ("windows imports are not implemented yet").
+ * Use a path relative to `turbopack.root` (`configDir` / the `web` folder).
+ */
+const ioredisBuiltUtilsTurbopack = "./node_modules/ioredis/built/utils/index.js";
+
 const nextConfig: NextConfig = {
   output: "standalone",
   experimental: {
@@ -14,6 +22,18 @@ const nextConfig: NextConfig = {
   },
   turbopack: {
     root: configDir,
+    resolveAlias: {
+      "ioredis/built/utils": ioredisBuiltUtilsTurbopack,
+    },
+  },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        "ioredis/built/utils": ioredisBuiltUtilsWebpack,
+      };
+    }
+    return config;
   },
   typescript: {
     // Docker build currently focuses on producing runnable images; type checks run separately in CI.
@@ -27,7 +47,7 @@ const nextConfig: NextConfig = {
     return [{ source: "/payments/:path*", destination: `${base}/payments/:path*` }];
   },
   // pdf-parse and pdfjs-dist: run from node_modules so pdf.worker.mjs resolves (fixes NTN certificate verification in API routes)
-  // Note: ioredis is auto-externalized by Next/Turbopack; adding it to transpilePackages conflicts and causes a fatal error.
+  // ioredis: keep default externalization; `ioredis/built/utils` is aliased above for bullmq subpath imports.
   serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
 };
 

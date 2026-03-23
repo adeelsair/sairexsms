@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { s3 } from "@/lib/s3";
 import { requireAuth } from "@/lib/auth-guard";
 import { resolveOrgId } from "@/lib/tenant";
+import { getObjectStorage, isObjectStorageConfigured, tenantObjectKey } from "@/lib/storage";
 
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml"];
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -33,24 +31,22 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!isObjectStorageConfigured()) {
+      return NextResponse.json(
+        { error: "Object storage is not configured for direct uploads." },
+        { status: 503 },
+      );
+    }
+
     const { fileType } = parsed.data;
     const orgId = resolveOrgId(guard);
 
     const ext = fileType.split("/")[1] === "svg+xml" ? "svg" : fileType.split("/")[1];
-    const key = `organizations/${orgId}/branding/logo_${Date.now()}.${ext}`;
+    const key = `${tenantObjectKey(orgId, "branding")}/logo_${Date.now()}.${ext}`;
 
-    const command = new PutObjectCommand({
-      Bucket: process.env.AWS_S3_BUCKET!,
-      Key: key,
-      ContentType: fileType,
-    });
-
-    const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 120 });
-
-    const cdnBase = process.env.NEXT_PUBLIC_CDN_URL;
-    const fileUrl = cdnBase
-      ? `${cdnBase}/${key}`
-      : `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+    const storage = getObjectStorage();
+    const uploadUrl = await storage.getSignedPutUrl(key, fileType);
+    const fileUrl = storage.buildPublicUrl(key);
 
     return NextResponse.json({ uploadUrl, fileUrl, key });
   } catch (error) {

@@ -1,17 +1,14 @@
 import { NextResponse } from "next/server";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { s3 } from "@/lib/s3";
 import { prisma } from "@/lib/prisma";
 import { requireVerifiedAuth } from "@/lib/auth-guard";
 import { resolveOrgId } from "@/lib/tenant";
 import { validateImage, generateVariants, deletePrefix } from "@/lib/media";
-
-function buildUrl(key: string): string {
-  const cdnBase = process.env.NEXT_PUBLIC_CDN_URL;
-  return cdnBase
-    ? `${cdnBase}/${key}`
-    : `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
-}
+import {
+  getObjectStorage,
+  isObjectStorageConfigured,
+  onboardingUserBrandingPrefix,
+  tenantObjectKey,
+} from "@/lib/storage";
 
 /**
  * POST /api/media/logo/upload
@@ -43,13 +40,9 @@ export async function POST(request: Request) {
     let savedAssets: { variant: string; url: string; key: string }[] = [];
     let logoUrl: string | undefined;
 
-    const hasS3 =
-      process.env.AWS_ACCESS_KEY_ID &&
-      process.env.AWS_SECRET_ACCESS_KEY &&
-      process.env.AWS_S3_BUCKET &&
-      process.env.AWS_REGION;
+    const hasStorage = isObjectStorageConfigured();
 
-    if (!orgId && !hasS3) {
+    if (!orgId && !hasStorage) {
       // Onboarding without S3: return logo as data URL so dev works without AWS
       const md = variants.find((v) => v.variant === "MD") ?? variants[0];
       const dataUrl = `data:${md.mimeType};base64,${md.buffer.toString("base64")}`;
@@ -59,34 +52,37 @@ export async function POST(request: Request) {
         url: `data:${v.mimeType};base64,${v.buffer.toString("base64")}`,
         key: `onboarding/users/${guard.id}/branding/logo_${versionTag}_${v.variant.toLowerCase()}.webp`,
       }));
-    } else if (!hasS3) {
+    } else if (!hasStorage) {
       return NextResponse.json(
-        { error: "Logo upload is not configured. Set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_BUCKET, and AWS_REGION." },
+        {
+          error:
+            "Logo upload is not configured. Set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_S3_BUCKET (plus S3_ENDPOINT for Cloudflare R2).",
+        },
         { status: 503 },
       );
     } else {
+      const storage = getObjectStorage();
       const basePath = orgId
-        ? `organizations/${orgId}/branding`
-        : `onboarding/users/${guard.id}/branding`;
+        ? tenantObjectKey(orgId, "branding")
+        : onboardingUserBrandingPrefix(String(guard.id));
 
       if (orgId) {
         await deletePrefix(`${basePath}/`);
+        // Legacy layout before `tenants/` prefix (no-op if bucket has no old keys).
+        await deletePrefix(`organizations/${orgId}/branding/`);
       }
 
       for (const v of variants) {
         const key = `${basePath}/logo_${versionTag}_${v.variant.toLowerCase()}.webp`;
 
-        await s3.send(
-          new PutObjectCommand({
-            Bucket: process.env.AWS_S3_BUCKET!,
-            Key: key,
-            Body: v.buffer,
-            ContentType: v.mimeType,
-            CacheControl: "public, max-age=31536000, immutable",
-          }),
-        );
+        await storage.uploadObject({
+          key,
+          body: v.buffer,
+          contentType: v.mimeType,
+          cacheControl: "public, max-age=31536000, immutable",
+        });
 
-        savedAssets.push({ variant: v.variant, url: buildUrl(key), key });
+        savedAssets.push({ variant: v.variant, url: storage.buildPublicUrl(key), key });
       }
 
       if (savedAssets.length > 0) {

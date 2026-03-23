@@ -8,8 +8,7 @@ import { generateUnitCode, generateCityCode, buildFullUnitPath } from "@/lib/uni
 import { createUnitProfile } from "@/lib/unit-profile";
 import { bootstrapDemoDataIfEmpty } from "@/lib/bootstrap/demo-seed.service";
 import { TRIAL_POLICY, createTrialWindow } from "@/lib/billing/pricing-architecture";
-import { s3 } from "@/lib/s3";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { getObjectStorage, isObjectStorageConfigured, tenantObjectKey } from "@/lib/storage";
 
 function slugify(name: string): string {
   return name
@@ -43,47 +42,28 @@ function fileExtFromMime(mimeType: string): string {
   return "bin";
 }
 
-function buildPublicUrl(key: string): string {
-  const cdnBase = process.env.NEXT_PUBLIC_CDN_URL;
-  if (cdnBase) return `${cdnBase}/${key}`;
-  return `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
-}
-
-async function uploadCertificateDataUrl({
-  dataUrl,
-  key,
-}: {
-  dataUrl: string;
-  key: string;
-}): Promise<string> {
-  const hasS3 =
-    process.env.AWS_ACCESS_KEY_ID &&
-    process.env.AWS_SECRET_ACCESS_KEY &&
-    process.env.AWS_S3_BUCKET &&
-    process.env.AWS_REGION;
-
-  if (!hasS3) {
-    // Dev/no-aws mode: persist the data URL in DB so Preview works.
+/**
+ * When object storage is configured, uploads privately and returns the **object key**
+ * (`tenants/...`) for later signed GET access. Otherwise returns the inline data URL (dev).
+ */
+async function persistCertificateToStorage(dataUrl: string, key: string): Promise<string> {
+  if (!isObjectStorageConfigured()) {
     return dataUrl;
   }
 
   const decoded = decodeDataUrlBase64(dataUrl);
   if (!decoded) {
-    // If it’s not a base64 data-url, fail fast.
     throw new Error("Certificate data URL is invalid or not base64-encoded.");
   }
 
-  await s3.send(
-    new PutObjectCommand({
-      Bucket: process.env.AWS_S3_BUCKET!,
-      Key: key,
-      Body: decoded.buffer,
-      ContentType: decoded.mimeType,
-      CacheControl: "public, max-age=31536000, immutable",
-    }),
-  );
+  await getObjectStorage().uploadObject({
+    key,
+    body: decoded.buffer,
+    contentType: decoded.mimeType,
+    cacheControl: "private, no-store",
+  });
 
-  return buildPublicUrl(key);
+  return key;
 }
 
 /**
@@ -167,22 +147,23 @@ export async function POST(request: Request) {
 
     const regKey =
       registrationCertDataUrl && registrationCertDataUrl.length > 0
-        ? `organizations/${orgId}/certificates/registration.${fileExtFromMime(decodeDataUrlBase64(registrationCertDataUrl)?.mimeType ?? "application/octet-stream")}`
+        ? tenantObjectKey(
+            orgId,
+            "certificates",
+            `registration.${fileExtFromMime(
+              decodeDataUrlBase64(registrationCertDataUrl)?.mimeType ?? "application/octet-stream",
+            )}`,
+          )
         : null;
-    const ntnKey = `organizations/${orgId}/certificates/ntn.${fileExtFromMime(decodeDataUrlBase64(ntnCertDataUrl)?.mimeType ?? "application/pdf")}`;
+    const ntnMime = decodeDataUrlBase64(ntnCertDataUrl)?.mimeType ?? "application/pdf";
+    const ntnKey = tenantObjectKey(orgId, "certificates", `ntn.${fileExtFromMime(ntnMime)}`);
 
     let registrationCertificateUrl: string | null = null;
     if (regKey && registrationCertDataUrl) {
-      registrationCertificateUrl = await uploadCertificateDataUrl({
-        dataUrl: registrationCertDataUrl,
-        key: regKey,
-      });
+      registrationCertificateUrl = await persistCertificateToStorage(registrationCertDataUrl, regKey);
     }
 
-    const ntnCertificateUrl = await uploadCertificateDataUrl({
-      dataUrl: ntnCertDataUrl,
-      key: ntnKey,
-    });
+    const ntnCertificateUrl = await persistCertificateToStorage(ntnCertDataUrl, ntnKey);
 
     const trialWindow = createTrialWindow();
     const result = await prisma.$transaction(async (tx) => {
