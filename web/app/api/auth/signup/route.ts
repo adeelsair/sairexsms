@@ -1,38 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import crypto from "crypto";
 import { applyRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
-import { dispatchAuthEmail } from "@/lib/auth-email-delivery";
 import {
   PASSWORD_POLICY_ERROR,
   isPasswordPolicyCompliant,
 } from "@/lib/auth/password-policy";
-
-async function sendVerificationEmail(toEmail: string, verifyToken: string) {
-  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-  const verifyUrl = `${baseUrl}/api/auth/verify-email?token=${verifyToken}`;
-
-  await dispatchAuthEmail({
-    to: toEmail,
-    subject: "Verify your email — SAIREX SMS",
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-        <h2 style="color: #1e40af;">SAIREX SMS</h2>
-        <p>Thank you for registering. Please verify your email address to continue.</p>
-        <p style="margin: 24px 0;">
-          <a href="${verifyUrl}"
-             style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">
-            Verify Email
-          </a>
-        </p>
-        <p style="color: #64748b; font-size: 14px;">
-          This link expires in 24 hours. If you didn't create this account, ignore this email.
-        </p>
-      </div>
-    `,
-  });
-}
+import {
+  newEmailVerificationToken,
+  sendVerificationEmail,
+} from "@/lib/auth/verification-email";
 
 /**
  * POST /api/auth/signup
@@ -72,8 +49,22 @@ export async function POST(request: Request) {
 
     if (existingUser) {
       if (!existingUser.emailVerifiedAt && !existingUser.platformRole) {
-        const verifyToken = crypto.randomBytes(32).toString("hex");
-        const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        const activeMemberships = await prisma.membership.count({
+          where: { userId: existingUser.id, status: "ACTIVE" },
+        });
+        // Invited users are created with an active membership but no verified email.
+        // Do not overwrite password / deactivate via public signup — they must use the invite link.
+        if (activeMemberships > 0) {
+          return NextResponse.json(
+            {
+              error:
+                "This email is already linked to an organization invite. Open your invitation email and use the signup link, or ask your admin to resend the invite.",
+            },
+            { status: 409 },
+          );
+        }
+
+        const { token: verifyToken, expiresAt: verifyExpires } = newEmailVerificationToken();
 
         await prisma.user.update({
           where: { id: existingUser.id },
@@ -86,7 +77,7 @@ export async function POST(request: Request) {
           },
         });
 
-        await sendVerificationEmail(normalizedEmail, verifyToken);
+        await sendVerificationEmail(normalizedEmail, verifyToken, existingUser.id);
 
         return NextResponse.json(
           {
@@ -185,10 +176,9 @@ export async function POST(request: Request) {
     // Create user as inactive + unverified, send verification email.
     // Org creation deferred to onboarding wizard.
 
-    const verifyToken = crypto.randomBytes(32).toString("hex");
-    const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const { token: verifyToken, expiresAt: verifyExpires } = newEmailVerificationToken();
 
-    await prisma.user.create({
+    const created = await prisma.user.create({
       data: {
         name,
         email: normalizedEmail,
@@ -197,8 +187,9 @@ export async function POST(request: Request) {
         emailVerifyToken: verifyToken,
         emailVerifyExpires: verifyExpires,
       },
+      select: { id: true },
     });
-    await sendVerificationEmail(normalizedEmail, verifyToken);
+    await sendVerificationEmail(normalizedEmail, verifyToken, created.id);
 
     return NextResponse.json(
       {

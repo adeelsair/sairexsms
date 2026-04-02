@@ -25,6 +25,10 @@ export interface ApiError {
   error: string;
   /** Field-level validation errors from Zod */
   fieldErrors?: Record<string, string[]>;
+  /** Set by login when email is not verified yet */
+  needsVerification?: boolean;
+  /** Pending org invite — user must use invite link, not resend verification */
+  useInviteLink?: boolean;
 }
 
 export type ApiResult<T> = ApiSuccess<T> | ApiError;
@@ -63,7 +67,7 @@ async function request<T>(
     }
 
     // Error response — normalize shape
-    return {
+    const err: ApiError = {
       ok: false,
       status: res.status,
       error:
@@ -72,6 +76,15 @@ async function request<T>(
         `Request failed (${res.status})`,
       fieldErrors: body?.errors,
     };
+    if (body && typeof body === "object") {
+      if ("needsVerification" in body && body.needsVerification === true) {
+        err.needsVerification = true;
+      }
+      if ("useInviteLink" in body && body.useInviteLink === true) {
+        err.useInviteLink = true;
+      }
+    }
+    return err;
   } catch (err) {
     return {
       ok: false,

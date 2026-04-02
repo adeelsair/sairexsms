@@ -1,6 +1,5 @@
 /**
  * In-Memory Rate Limiter
- *
  * Sliding-window counters with automatic cleanup.
  * Use for API routes, OTP requests, webhook endpoints, and login attempts.
  *
@@ -88,6 +87,8 @@ export const RATE_LIMITS = {
   OTP_REQUEST: { max: 5, windowSeconds: 300 } as RateLimitConfig,
   OTP_VERIFY: { max: 10, windowSeconds: 300 } as RateLimitConfig,
   LOGIN_ATTEMPT: { max: 10, windowSeconds: 300 } as RateLimitConfig,
+  /** Stricter cap: resend verification emails */
+  RESEND_VERIFICATION: { max: 5, windowSeconds: 3600 } as RateLimitConfig,
   WEBHOOK: { max: 200, windowSeconds: 60 } as RateLimitConfig,
   QR_RESOLVE: { max: 60, windowSeconds: 60 } as RateLimitConfig,
   PAYMENT_INITIATE: { max: 20, windowSeconds: 60 } as RateLimitConfig,

@@ -5,7 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { requireVerifiedAuth } from "@/lib/auth-guard";
 import { enqueue, OTP_QUEUE } from "@/lib/queue";
 import { sendOtpEmail } from "@/lib/email";
-import { assertSmsConfiguredForOtp, sendSmsMessage } from "@/lib/sms";
+import {
+  assertSmsConfiguredForOtp,
+  isSmsDryRunEnabled,
+  sendSmsMessage,
+} from "@/lib/sms";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
 
 const CHANNELS = ["email", "mobile", "whatsapp"] as const;
@@ -23,6 +27,22 @@ function generateOtp(): string {
 
 function hashOtp(code: string): string {
   return crypto.createHash("sha256").update(code).digest("hex");
+}
+
+async function deleteFreshVerificationCode(params: {
+  userId: number;
+  channel: (typeof CHANNELS)[number];
+  target: string;
+  codeHash: string;
+}): Promise<void> {
+  await prisma.verificationCode.deleteMany({
+    where: {
+      userId: params.userId,
+      channel: params.channel,
+      target: params.target,
+      codeHash: params.codeHash,
+    },
+  });
 }
 
 /**
@@ -104,18 +124,80 @@ export async function POST(request: Request) {
     });
 
     const isDev = process.env.NODE_ENV === "development";
+    const codeHash = hashOtp(code);
 
-    // In production, fail fast if SMS/WhatsApp isn't configured.
-    if (!isDev && channel === "mobile") {
+    // Production mobile: send SMS in the API request so we only return success after the provider
+    // accepts the message. (Previously we enqueued and returned sent:true immediately — if the OTP
+    // worker was down, Redis failed, or SMS_DRY_RUN was on, users saw "sent" but got no SMS.)
+    if (channel === "mobile" && !isDev) {
       try {
         assertSmsConfiguredForOtp();
       } catch (e) {
+        await deleteFreshVerificationCode({
+          userId: guard.id,
+          channel: "mobile",
+          target,
+          codeHash,
+        });
         const msg = e instanceof Error ? e.message : "SMS is not configured";
         return NextResponse.json(
-          { error: `SMS verification is not configured on the server (${msg}).` },
+          {
+            error: `SMS verification is not configured on the server (${msg}).`,
+            sent: false,
+            smsConfigHint:
+              "Set SMS_PROVIDER, VEEVO_HASH + VEEVO_SENDER, or SMSMOBILE_API_KEY on the app server and restart.",
+          },
           { status: 503 },
         );
       }
+
+      if (isSmsDryRunEnabled()) {
+        await deleteFreshVerificationCode({
+          userId: guard.id,
+          channel: "mobile",
+          target,
+          codeHash,
+        });
+        return NextResponse.json(
+          {
+            error:
+              "SMS dry-run is enabled (SMS_DRY_RUN). Disable it in production to deliver real verification texts.",
+            sent: false,
+            smsConfigHint:
+              "Unset SMS_DRY_RUN or set SMS_DRY_RUN=0 in server.env, then restart app and worker containers.",
+          },
+          { status: 503 },
+        );
+      }
+
+      const smsBody = `Your SAIREX SMS verification code is: ${code}. Valid for 10 minutes.`;
+      try {
+        await sendSmsMessage(target, smsBody);
+      } catch (smsErr) {
+        await deleteFreshVerificationCode({
+          userId: guard.id,
+          channel: "mobile",
+          target,
+          codeHash,
+        });
+        const errMsg = smsErr instanceof Error ? smsErr.message : String(smsErr);
+        console.error("[Verify Send] Production SMS failed:", smsErr);
+        return NextResponse.json(
+          {
+            error: `SMS could not be sent: ${errMsg}`,
+            sent: false,
+            smsConfigHint:
+              "Check provider credentials (VEEVO_* or SMSMOBILE_*), SMS_PROVIDER, balance, and phone format (e.g. 03XXXXXXXXX).",
+          },
+          { status: 502 },
+        );
+      }
+
+      return NextResponse.json({
+        sent: true,
+        expiresInSeconds: 600,
+        maxAttempts: MAX_ATTEMPTS,
+      });
     }
 
     // In development, send email or SMS synchronously so the code is delivered without needing the OTP worker.

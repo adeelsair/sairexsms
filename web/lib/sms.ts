@@ -17,9 +17,14 @@ export function normalizePkPhone(phone: string): string {
   return digits;
 }
 
-function isDryRunEnabled(): boolean {
+/** True when SMS is logged only (no real provider call). */
+export function isSmsDryRunEnabled(): boolean {
   const value = (process.env.SMS_DRY_RUN ?? "").trim().toLowerCase();
   return value === "1" || value === "true" || value === "yes";
+}
+
+function isDryRunEnabled(): boolean {
+  return isSmsDryRunEnabled();
 }
 
 function resolveSmsProvider(): "veevo" | "smsmobileapi" {

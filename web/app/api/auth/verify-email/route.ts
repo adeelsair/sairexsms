@@ -33,7 +33,9 @@ export async function GET(request: Request) {
     }
 
     if (user.emailVerifyExpires && new Date() > user.emailVerifyExpires) {
-      return redirectWithError("Verification link has expired. Please register again.");
+      return redirectWithError(
+        "Verification link has expired. Sign in with your password and use “Resend verification email”, or sign up again with the same email to get a new link.",
+      );
     }
 
     // Activate user + clear verification token

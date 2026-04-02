@@ -8,7 +8,7 @@ import {
 } from "@/lib/auth/session-issuer";
 
 const loginSchema = z.object({
-  email: z.string().trim().email(),
+  email: z.string().trim().email().transform((e) => e.toLowerCase()),
   password: z.string().min(1),
 });
 
@@ -41,17 +41,34 @@ export async function POST(request: Request) {
       },
     });
 
-    if (!user || !user.isActive || !user.password) {
+    if (!user || !user.password) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
-    }
-
-    if (!user.emailVerifiedAt && !user.platformRole) {
-      return NextResponse.json({ error: "Email verification required" }, { status: 403 });
     }
 
     const passwordValid = await bcrypt.compare(parsed.data.password, user.password);
     if (!passwordValid) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+    }
+
+    if (!user.emailVerifiedAt && !user.platformRole) {
+      const activeMemberships = await prisma.membership.count({
+        where: { userId: user.id, status: "ACTIVE" },
+      });
+      return NextResponse.json(
+        {
+          error:
+            activeMemberships > 0
+              ? "Complete signup using the link in your invitation email."
+              : "Email verification required",
+          needsVerification: true,
+          useInviteLink: activeMemberships > 0,
+        },
+        { status: 403 },
+      );
+    }
+
+    if (!user.isActive) {
+      return NextResponse.json({ error: "Account not active" }, { status: 401 });
     }
 
     const issued = await issueSessionForUserId(user.id);

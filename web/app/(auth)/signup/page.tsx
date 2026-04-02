@@ -9,8 +9,6 @@ import { toast } from "sonner";
 import {
   Loader2,
   AlertTriangle,
-  CheckCircle2,
-  Mail,
   Eye,
   EyeOff,
   Info,
@@ -52,6 +50,7 @@ interface SignupResponse {
   user?: { id: number; email: string };
   organizationName?: string;
   verified: boolean;
+  resent?: boolean;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -70,8 +69,6 @@ function SignupForm() {
 
   const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null);
   const [inviteError, setInviteError] = useState("");
-  const [emailSent, setEmailSent] = useState(false);
-  const [registeredEmail, setRegisteredEmail] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -145,9 +142,8 @@ function SignupForm() {
           router.refresh();
         }
       } else {
-        // Self-register: show verification email sent screen
-        setEmailSent(true);
-        setRegisteredEmail(data.email);
+        // Self-register: stay on this form — user can submit again to resend until verified
+        toast.success(result.data.message);
       }
     } else if (result.fieldErrors) {
       for (const [field, messages] of Object.entries(result.fieldErrors)) {
@@ -188,33 +184,6 @@ function SignupForm() {
       <div className="rounded-xl border border-border bg-card p-6 text-center text-muted-foreground shadow-sm sm:p-8">
         <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin" />
         Validating invite...
-      </div>
-    );
-  }
-
-  /* ── Email sent success state ────────────────────────────── */
-
-  if (emailSent) {
-    return (
-      <div className="rounded-xl border border-border bg-card p-6 text-center shadow-sm sm:p-8">
-        <Mail className="mx-auto mb-4 h-10 w-10 text-primary" />
-        <h2 className="mb-2 text-xl font-semibold text-foreground">
-          Check your email
-        </h2>
-        <p className="mb-2 text-sm text-muted-foreground">
-          We sent a verification link to
-        </p>
-        <p className="mb-6 font-medium text-foreground">{registeredEmail}</p>
-        <p className="mb-6 text-xs text-muted-foreground">
-          Click the link in the email to verify your address and continue setting up your organization.
-          The link expires in 24 hours.
-        </p>
-        <Link
-          href="/login"
-          className="text-sm font-medium text-primary hover:text-primary/80"
-        >
-          Go to login
-        </Link>
       </div>
     );
   }
@@ -391,7 +360,8 @@ function SignupForm() {
 
       {!isInvited && (
         <p className="mt-3 text-center text-xs text-muted-foreground">
-          We&apos;ll send a verification email to confirm your address.
+          We&apos;ll email you a verification link. If it doesn&apos;t arrive, submit this form again
+          with the same email and password — we&apos;ll send a new link until you verify (check spam).
         </p>
       )}
 
